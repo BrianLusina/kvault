@@ -1,2 +1,4 @@
 # kvault
-Simple Key-Value Miniature Database
+
+Simple Miniature Key-Value Datastore
+

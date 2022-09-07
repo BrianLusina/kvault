@@ -1,0 +1,96 @@
+# Reference:https://github.com/marketplace/actions/build-and-push-docker-images
+name: Docker
+
+on:
+  # Runs this workflow only after the Build Workflow has completed
+  workflow_run:
+    workflows:
+      - "Tests"
+    branches:
+      - 'main'
+    types:
+      - completed
+
+jobs:
+
+  push_docker_image:
+    name: Push Docker Image To Registries
+    runs-on: ubuntu-latest
+
+    # Runs this workflow conditionally on whether the previous workflow has concluded successfully
+    # Ref: https://docs.github.com/en/actions/reference/events-that-trigger-workflows#workflow_run
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      # https://github.com/docker/build-push-action/blob/v2.5.0/docs/advanced/tags-labels.md
+      - name: Docker Meta
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          # list of Docker images to use as base name for tags
+          images: |
+            ${{ secrets.DOCKER_REGISTRY }}/${{secrets.DOCKER_REPOSITORY}}
+            ghcr.io/${{ github.repository }}
+          # generate Docker tags based on the following events/attributes
+          tags: |
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        id: docker_cache
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Log In to Docker Hub Registry
+        if: github.event_name != 'pull_request'
+        id: docker_hub_registry_login
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Log In to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        id: ghcr_login
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Image to Docker Hub Registry
+        uses: docker/build-push-action@v2
+        id: docker_build
+        with:
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Push Image to GitHub Container Registry
+        uses: docker/build-push-action@v2
+        id: ghcr_docker_build
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
