@@ -26,3 +26,9 @@ lint:
 
 load-test:
 	locust --config .locust.conf
+
+pre-commit-install:
+	pre-commit install
+
+pre-commit:
+	pre-commit run --all-files
