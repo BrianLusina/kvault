@@ -1,0 +1,202 @@
+from typing import Dict, Callable
+from collections import deque
+import time
+from gevent.pool import Pool
+from gevent.server import StreamServer
+from .logger import logger
+from .exceptions import ClientQuit, Shutdown, CommandError, Error
+from .protocol_handler import ProtocolHandler
+from .types import basestring, Value
+from .utils import decode
+from commands import QueueCommands, KvCommands, HashCommands, SetCommands, MiscCommands, ScheduleCommands
+
+KV = 0
+HASH = 1
+QUEUE = 2
+SET = 3
+
+
+class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscCommands, ScheduleCommands):
+    def __init__(self, host: str = '127.0.0.1', port: int = 31337, max_clients: int = 1024):
+        self._kv: Dict[bytes, Value] = {}
+        self._expiry_map = {}
+        super().__init__(kv=self._kv, expiry_map=self._expiry_map)
+        self._host = host
+        self._port = port
+        self._max_clients = max_clients
+        self._pool = Pool(max_clients)
+        self._server = StreamServer(listener=(self._host, self._port), handle=self.connection_handler)
+        self._commands = self.get_commands()
+        self._protocol = ProtocolHandler()
+        self._schedule = []
+        self._expiry = []
+
+        self._active_connections = 0
+        self._commands_processed = 0
+        self._command_errors = 0
+        self._connections = 0
+
+    def connection_handler(self, conn, address):
+        logger.info('Connection received: %s:%s' % address)
+        socket_file = conn.makefile('rwb')
+        self._active_connections += 1
+        while True:
+            try:
+                self.request_response(socket_file)
+            except EOFError:
+                logger.info('Client went away: %s:%s' % address)
+                socket_file.close()
+                break
+            except ClientQuit:
+                logger.info('Client exited: %s:%s.' % address)
+                break
+            except Exception as exc:
+                logger.exception('Error processing command.')
+        self._active_connections -= 1
+
+    def request_response(self, socket_file):
+        data = self._protocol.handle_request(socket_file)
+        try:
+            resp = self.respond(data)
+        except Shutdown:
+            logger.info("Shutting down")
+            self._protocol.write_response(socket_file=socket_file, data=1)
+            raise KeyboardInterrupt
+        except ClientQuit:
+            self._protocol.write_response(socket_file=socket_file, data=1)
+            raise
+        except CommandError as cmd_error:
+            resp = Error(cmd_error.message)
+            self._command_errors += 1
+        except Exception as err:
+            logger.exception("Unhanded Exception")
+            resp = Error('Unhandled server error')
+        else:
+            self._commands_processed += 1
+        self._protocol.write_response(socket_file=socket_file, data=resp)
+
+    def respond(self, data):
+        if not isinstance(data, list):
+            try:
+                data = data.split()
+            except:
+                raise CommandError('Unrecognized request type.')
+        if not isinstance(data[0], basestring):
+            raise CommandError('First parameter must be command name.')
+
+        command = data[0].upper()
+        if command not in self._commands:
+            raise CommandError(f'Unrecognized command: ${command}')
+        else:
+            logger.debug('Received %s', decode(command))
+
+        return self._commands[command](*data[1:])
+
+    def check_datatype(self, data_type, key, set_missing=True, subtype=None):
+        if key in self._kv and self.check_expired(key):
+            del self._kv[key]
+
+        if key in self._kv:
+            value = self._kv[key]
+            if value.data_type != data_type:
+                raise CommandError('Operation against wrong key type.')
+            if subtype is not None and not isinstance(value.value, subtype):
+                raise CommandError('Operation against wrong value type.')
+        elif set_missing:
+            value = None
+            if data_type == HASH:
+                value = {}
+            elif data_type == QUEUE:
+                value = deque()
+            elif data_type == SET:
+                value = set()
+            elif data_type == KV:
+                value = ''
+            self._kv[key] = Value(data_type, value)
+
+    def check_expired(self, key, ts=None):
+        ts = ts or time.time()
+        return key in self._expiry_map and ts > self._expiry_map[key]
+
+    def get_commands(self) -> Dict[bytes, Callable]:
+        return dict((
+            # Queue commands
+            (b'LPUSH', self.lpush),
+            (b'RPUSH', self.rpush),
+            (b'LPOP', self.lpop),
+            (b'RPOP', self.rpop),
+            (b'LREM', self.lrem),
+            (b'LLEN', self.llen),
+            (b'LINDEX', self.lindex),
+            (b'LRANGE', self.lrange),
+            (b'LSET', self.lset),
+            (b'LTRIM', self.ltrim),
+            (b'RPOPLPUSH', self.rpoplpush),
+            (b'LFLUSH', self.lflush),
+
+            # K/V commands
+            (b'APPEND', self.kv_append),
+            (b'DECR', self.kv_decr),
+            (b'DECRBY', self.kv_decrby),
+            (b'DELETE', self.kv_delete),
+            (b'EXISTS', self.kv_exists),
+            (b'GET', self.kv_get),
+            (b'GETSET', self.kv_getset),
+            (b'INCR', self.kv_incr),
+            (b'INCRBY', self.kv_incrby),
+            (b'MDELETE', self.kv_mdelete),
+            (b'MGET', self.kv_mget),
+            (b'MPOP', self.kv_mpop),
+            (b'MSET', self.kv_mset),
+            (b'MSETEX', self.kv_msetex),
+            (b'POP', self.kv_pop),
+            (b'SET', self.kv_set),
+            (b'SETNX', self.kv_setnx),
+            (b'SETEX', self.kv_setex),
+            (b'LEN', self.kv_len),
+            (b'FLUSH', self.kv_flush),
+
+            # Hash commands.
+            (b'HDEL', self.hdel),
+            (b'HEXISTS', self.hexists),
+            (b'HGET', self.hget),
+            (b'HGETALL', self.hgetall),
+            (b'HINCRBY', self.hincrby),
+            (b'HKEYS', self.hkeys),
+            (b'HLEN', self.hlen),
+            (b'HMGET', self.hmget),
+            (b'HMSET', self.hmset),
+            (b'HSET', self.hset),
+            (b'HSETNX', self.hsetnx),
+            (b'HVALS', self.hvals),
+
+            # Set commands.
+            (b'SADD', self.sadd),
+            (b'SCARD', self.scard),
+            (b'SDIFF', self.sdiff),
+            (b'SDIFFSTORE', self.sdiffstore),
+            (b'SINTER', self.sinter),
+            (b'SINTERSTORE', self.sinterstore),
+            (b'SISMEMBER', self.sismember),
+            (b'SMEMBERS', self.smembers),
+            (b'SPOP', self.spop),
+            (b'SREM', self.srem),
+            (b'SUNION', self.sunion),
+            (b'SUNIONSTORE', self.sunionstore),
+
+            # Schedule commands.
+            (b'ADD', self.schedule_add),
+            (b'READ', self.schedule_read),
+            (b'FLUSH_SCHEDULE', self.schedule_flush),
+            (b'LENGTH_SCHEDULE', self.schedule_length),
+
+            # Misc.
+            (b'EXPIRE', self.expire),
+            (b'INFO', self.info),
+            (b'FLUSHALL', self.flush_all),
+            (b'SAVE', self.save_to_disk),
+            (b'RESTORE', self.restore_from_disk),
+            (b'MERGE', self.merge_from_disk),
+            (b'QUIT', self.client_quit),
+            (b'SHUTDOWN', self.shutdown),
+        ))
