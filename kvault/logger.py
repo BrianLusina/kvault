@@ -6,7 +6,7 @@ Reference: https://github.com/Delgan/loguru
 import os
 import sys
 import logging
-from loguru import logger as log
+from loguru import logger
 
 logging.root.setLevel(logging.INFO)
 
@@ -30,7 +30,7 @@ def backtrace() -> bool:
 
 
 # info log configurations
-log.add(
+logger.add(
     sink=configure_log_sink("info"),
     backtrace=backtrace(),
     colorize=True,
@@ -41,7 +41,7 @@ log.add(
 )
 
 # error logs
-log.add(
+logger.add(
     sink=configure_log_sink("error"),
     backtrace=backtrace(),
     colorize=True,
@@ -52,7 +52,7 @@ log.add(
 )
 
 # debug logs
-log.add(
+logger.add(
     sink=configure_log_sink("debug"),
     backtrace=backtrace(),
     colorize=True,
@@ -63,7 +63,7 @@ log.add(
 )
 
 # warning logs
-log.add(
+logger.add(
     sink=configure_log_sink("warn"),
     backtrace=backtrace(),
     colorize=True,
@@ -74,7 +74,7 @@ log.add(
 )
 
 # critical logs
-log.add(
+logger.add(
     sink=configure_log_sink("critical"),
     backtrace=backtrace(),
     colorize=True,
@@ -85,7 +85,7 @@ log.add(
 )
 
 # trace logs
-log.add(
+logger.add(
     sink=configure_log_sink("trace"),
     backtrace=backtrace(),
     colorize=True,
