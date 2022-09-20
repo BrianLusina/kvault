@@ -5,7 +5,7 @@ from gevent.server import StreamServer
 from .logger import logger
 from .exceptions import ClientQuit, Shutdown, CommandError, Error
 from .protocol_handler import ProtocolHandler
-from .types import basestring, Value
+from .types import basestring, Value, unicode
 from .utils import decode
 from commands import QueueCommands, KvCommands, HashCommands, SetCommands, MiscCommands, ScheduleCommands
 
@@ -192,3 +192,11 @@ class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscComm
         self.kv_flush()
         self.schedule_flush()
         return 1
+
+    def run(self):
+        self._server.serve_forever()
+
+    def add_command(self, command, callback):
+        if isinstance(command, unicode):
+            command = command.encode('utf-8')
+        self._commands[command] = callback
