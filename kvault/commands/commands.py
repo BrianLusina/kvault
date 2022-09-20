@@ -1,5 +1,6 @@
 from collections import deque
-from typing import Dict, Optional
+from typing import Dict, Optional, AnyStr, List
+import heapq
 import time
 from ..types import Value
 from ..exceptions import CommandError
@@ -11,9 +12,10 @@ SET = 3
 
 
 class BaseCommand(object):
-    def __init__(self, kv: Optional[Dict[bytes, Value]], expiry_map: Dict):
-        self._kv: Dict[bytes, Value] = kv
+    def __init__(self, kv: Optional[Dict[AnyStr, Value]], expiry_map: Dict, expiry: List):
+        self._kv: Dict[AnyStr, Value] = kv
         self._expiry_map = expiry_map
+        self._expiry = expiry
 
     def check_expired(self, key, ts=None):
         ts = ts or time.time()
@@ -40,3 +42,8 @@ class BaseCommand(object):
             elif data_type == KV:
                 value = ''
             self._kv[key] = Value(data_type, value)
+
+    def expire(self, key, nseconds):
+        eta = time.time() + nseconds
+        self._expiry_map[key] = eta
+        heapq.heappush(self._expiry, (eta, key))

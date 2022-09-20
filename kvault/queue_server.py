@@ -1,5 +1,4 @@
-from typing import Dict, Callable
-from collections import deque
+from typing import Dict, Callable, AnyStr
 import time
 from gevent.pool import Pool
 from gevent.server import StreamServer
@@ -18,9 +17,10 @@ SET = 3
 
 class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscCommands, ScheduleCommands):
     def __init__(self, host: str = '127.0.0.1', port: int = 31337, max_clients: int = 1024):
-        self._kv: Dict[bytes, Value] = {}
+        self._kv: Dict[AnyStr, Value] = {}
         self._expiry_map = {}
-        super().__init__(kv=self._kv, expiry_map=self._expiry_map)
+        self._expiry = []
+        super().__init__(kv=self._kv, expiry_map=self._expiry_map, expiry=self._expiry)
         self._host = host
         self._port = port
         self._max_clients = max_clients
@@ -29,7 +29,6 @@ class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscComm
         self._commands = self.get_commands()
         self._protocol = ProtocolHandler()
         self._schedule = []
-        self._expiry = []
 
         self._active_connections = 0
         self._commands_processed = 0
@@ -91,28 +90,6 @@ class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscComm
             logger.debug('Received %s', decode(command))
 
         return self._commands[command](*data[1:])
-
-    def check_datatype(self, data_type, key, set_missing=True, subtype=None):
-        if key in self._kv and self.check_expired(key):
-            del self._kv[key]
-
-        if key in self._kv:
-            value = self._kv[key]
-            if value.data_type != data_type:
-                raise CommandError('Operation against wrong key type.')
-            if subtype is not None and not isinstance(value.value, subtype):
-                raise CommandError('Operation against wrong value type.')
-        elif set_missing:
-            value = None
-            if data_type == HASH:
-                value = {}
-            elif data_type == QUEUE:
-                value = deque()
-            elif data_type == SET:
-                value = set()
-            elif data_type == KV:
-                value = ''
-            self._kv[key] = Value(data_type, value)
 
     def check_expired(self, key, ts=None):
         ts = ts or time.time()
