@@ -20,7 +20,8 @@ class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscComm
         self._kv: Dict[AnyStr, Value] = {}
         self._expiry_map = {}
         self._expiry = []
-        super().__init__(kv=self._kv, expiry_map=self._expiry_map, expiry=self._expiry)
+        self._schedule = []
+        super().__init__(kv=self._kv, expiry_map=self._expiry_map, expiry=self._expiry, schedule=self._schedule)
         self._host = host
         self._port = port
         self._max_clients = max_clients
@@ -28,7 +29,6 @@ class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscComm
         self._server = StreamServer(listener=(self._host, self._port), handle=self.connection_handler)
         self._commands = self.get_commands()
         self._protocol = ProtocolHandler()
-        self._schedule = []
 
         self._active_connections = 0
         self._commands_processed = 0

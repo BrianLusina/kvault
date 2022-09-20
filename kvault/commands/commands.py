@@ -12,10 +12,11 @@ SET = 3
 
 
 class BaseCommand(object):
-    def __init__(self, kv: Optional[Dict[AnyStr, Value]], expiry_map: Dict, expiry: List):
+    def __init__(self, kv: Optional[Dict[AnyStr, Value]], expiry_map: Dict, expiry: List, schedule: List):
         self._kv: Dict[AnyStr, Value] = kv
         self._expiry_map = expiry_map
         self._expiry = expiry
+        self._schedule = schedule
 
     def check_expired(self, key, ts=None):
         ts = ts or time.time()
