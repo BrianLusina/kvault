@@ -48,3 +48,18 @@ class BaseCommand(object):
         eta = time.time() + nseconds
         self._expiry_map[key] = eta
         heapq.heappush(self._expiry, (eta, key))
+
+    def clean_expired(self, ts=None):
+        ts = ts or time.time()
+        n = 0
+        while self._expiry:
+            expires, key = heapq.heappop(self._expiry)
+            if expires > ts:
+                heapq.heappush(self._expiry, (expires, key))
+                break
+
+            if self._expiry_map.get(key) == expires:
+                del self._expiry_map[key]
+                del self._kv[key]
+                n += 1
+        return n

@@ -177,3 +177,18 @@ class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscComm
             (b'QUIT', self.client_quit),
             (b'SHUTDOWN', self.shutdown),
         ))
+
+    def info(self) -> Dict:
+        return {
+            'active_connections': self._active_connections,
+            'commands_processed': self._commands_processed,
+            'command_errors': self._command_errors,
+            'connections': self._connections,
+            'keys': len(self._kv),
+            'timestamp': time.time()
+        }
+
+    def flush_all(self):
+        self.kv_flush()
+        self.schedule_flush()
+        return 1
