@@ -1,6 +1,6 @@
 import pickle
 import os
-from commands import BaseCommand
+from .commands import BaseCommand
 from ..exceptions import ClientQuit, Shutdown
 
 

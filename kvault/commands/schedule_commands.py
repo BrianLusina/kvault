@@ -1,6 +1,6 @@
 import heapq
 import datetime
-from commands import BaseCommand
+from .commands import BaseCommand
 from ..utils import decode
 from ..exceptions import CommandError
 

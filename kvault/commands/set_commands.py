@@ -1,4 +1,4 @@
-from commands import BaseCommand, SET
+from .commands import BaseCommand, SET
 from ..utils import enforce_datatype
 from ..types import Value
 

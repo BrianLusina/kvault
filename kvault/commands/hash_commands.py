@@ -1,5 +1,5 @@
 from typing import Any, List, Dict
-from commands import BaseCommand, HASH
+from .commands import BaseCommand, HASH
 from ..utils import enforce_datatype
 from ..types import Value
 

@@ -1,6 +1,6 @@
 from typing import Union, Any, Optional, List, Dict
 from collections import deque
-from commands import BaseCommand, HASH, QUEUE, SET, KV
+from .commands import BaseCommand, HASH, QUEUE, SET, KV
 from ..exceptions import CommandError
 from ..types import Value
 from ..utils import enforce_datatype

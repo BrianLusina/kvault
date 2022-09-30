@@ -7,7 +7,7 @@ from .exceptions import ClientQuit, Shutdown, CommandError, Error
 from .protocol_handler import ProtocolHandler
 from .types import basestring, Value, unicode
 from .utils import decode
-from commands import QueueCommands, KvCommands, HashCommands, SetCommands, MiscCommands, ScheduleCommands
+from .commands import QueueCommands, KvCommands, HashCommands, SetCommands, MiscCommands, ScheduleCommands
 
 KV = 0
 HASH = 1
@@ -85,7 +85,8 @@ class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscComm
 
         command = data[0].upper()
         if command not in self._commands:
-            raise CommandError(f'Unrecognized command: ${command}')
+            logger.error(f"Unrecognized command: {command}")
+            raise CommandError(f'Unrecognized command: {command}')
         else:
             logger.debug('Received %s', decode(command))
 

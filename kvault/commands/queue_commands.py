@@ -1,5 +1,5 @@
 from collections import deque
-from commands import BaseCommand, QUEUE
+from .commands import BaseCommand, QUEUE
 from ..types import Value
 from ..utils import enforce_datatype
 
