@@ -7,7 +7,7 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-gevent = "^22.10.1"
+gevent = "^22.10.2"
 loguru = "^0.6.0"
 
 [tool.poetry.dev-dependencies]
