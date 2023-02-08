@@ -11,7 +11,7 @@ gevent = "^22.10.2"
 loguru = "^0.6.0"
 
 [tool.poetry.dev-dependencies]
-pylint = "^2.15.10"
+pylint = "^2.16.1"
 pytest = "^7.2.1"
 black = "^23.1.0"
 pre-commit = "^3.0.4"
