@@ -1,6 +1,7 @@
 from kvault.protocol_handler import ProtocolHandler
 from kvault.socket_pool import SocketPool
 from kvault.exceptions import ServerDisconnect, ServerInternalError, CommandError, Error
+from kvault.logger import logger
 
 
 class Client(object):
@@ -12,6 +13,7 @@ class Client(object):
         self._protocol = ProtocolHandler()
 
     def execute(self, *args):
+        logger.debug(f"Executing command {args}")
         conn = self._socket_pool.checkout()
         close_conn = args[0] in (b'QUIT', b'SHUTDOWN')
         self._protocol.write_response(conn, args)
@@ -35,6 +37,7 @@ class Client(object):
     def close(self):
         self.execute(b'QUIT')
 
+    @staticmethod
     def command(cmd):
         def method(self, *args):
             return self.execute(cmd.encode('utf-8'), *args)
@@ -130,5 +133,5 @@ class Client(object):
     def __contains__(self, key):
         return self.exists(key)
 
-    def __len__(self):
-        return self.length()
+    # def __len__(self):
+    #     return self.length()

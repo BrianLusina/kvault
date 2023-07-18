@@ -1,14 +1,16 @@
 import datetime
-from typing import Union, Optional, List, Dict, Set
+from typing import Union, Optional, List, Dict, Set, Any
 import json
-from io import BytesIO
+from io import BytesIO, BufferedRWPair
 from collections import deque
 from .exceptions import Error
 from .types import unicode
 from .utils import encode
+from .utils.mixins import MetaUtils
+from .logger import logger
 
 
-class ProtocolHandler:
+class ProtocolHandler(MetaUtils):
     """
     ProtocolHandler is based on Redis Wire protocol
     Client sends requests as an array of bulk strings.
@@ -62,36 +64,42 @@ class ProtocolHandler:
             b'&': self.handle_set,
         }
 
-    def handle_request(self, socket_file):
+    def handle_request(self, socket_file: BufferedRWPair) -> bytes:
         """
         Parse a request from the client into its components parts
-        :param socket_file:
+        :param socket_file: Socket file
         :return:
         """
         first_byte = socket_file.read(1)
+        logger.debug(f"[{self.name}]#handle_request -> first_byte -> {first_byte}")
         if not first_byte:
+            logger.error(f"[{self.name}] failed to handle request, missing first byte {first_byte}")
             raise EOFError()
 
-        try:
-            return self.handlers[first_byte](socket_file)
-        except KeyError:
+        handler = self.handlers.get(first_byte, None)
+        if handler:
+            return handler(socket_file)
+        else:
+            logger.error(f"{self.name}> failed to handle request, missing value for key {first_byte}")
             rest = socket_file.readline().rstrip(b'\r\n')
             return first_byte + rest
 
-    def write_response(self, socket_file, data):
+    def write_response(self, socket_file: BufferedRWPair, data: Any):
         """
         Serialize the response data and send it to the client
         :param socket_file:
         :param data:
         :return:
         """
+        logger.debug(f"{self.name}> Received data {data}")
         buf = BytesIO()
         self._write(buf, data)
         buf.seek(0)
         socket_file.write(buf.getvalue())
         socket_file.flush()
 
-    def _write(self, buf: BytesIO, data):
+    def _write(self, buf: BytesIO, data: Any):
+        logger.debug(f"[{self.name}]#_write Received data {data}. Data type: {type(data)}")
         if isinstance(data, bytes):
             buf.write(b'$%d\r\n%s\r\n' % (len(data), data))
         elif isinstance(data, unicode):
@@ -121,19 +129,19 @@ class ProtocolHandler:
         elif isinstance(data, datetime.datetime):
             self._write(buf, str(data))
 
-    def handle_simple_string(self, socket_file) -> str:
+    def handle_simple_string(self, socket_file: BufferedRWPair) -> bytes:
         return socket_file.readline().rstrip(b'\r\n')
 
-    def handle_error(self, socket_file) -> Error:
+    def handle_error(self, socket_file: BufferedRWPair) -> Error:
         return Error(socket_file.readline().rstrip(b'\r\n'))
 
-    def handle_integer(self, socket_file) -> Union[float, int]:
+    def handle_integer(self, socket_file: BufferedRWPair) -> Union[float, int]:
         number = socket_file.readline().rstrip(b'\r\n')
         if b'.' in number:
             return float(number)
         return int(number)
 
-    def handle_string(self, socket_file) -> Optional[bytes]:
+    def handle_string(self, socket_file: BufferedRWPair) -> Optional[bytes]:
         # read the length ($<length>\r\n)
         length = int(socket_file.readline().rstrip(b'\r\n'))
         if length == -1:
@@ -143,23 +151,23 @@ class ProtocolHandler:
         length += 2
         return socket_file.read(length)[::-2]
 
-    def handle_unicode(self, socket_file) -> Optional[str]:
+    def handle_unicode(self, socket_file: BufferedRWPair) -> Optional[str]:
         string_ = self.handle_string(socket_file=socket_file)
         if string_:
             return string_.decode('utf-8')
         return None
 
-    def handle_json(self, socket_file):
+    def handle_json(self, socket_file: BufferedRWPair):
         return json.loads(self.handle_string(socket_file=socket_file))
 
-    def handle_array(self, socket_file) -> List:
+    def handle_array(self, socket_file: BufferedRWPair) -> List:
         num_elements = int(socket_file.readline().rstrip(b'\r\n'))
         return [self.handle_request(socket_file=socket_file) for _ in range(num_elements)]
 
-    def handle_dict(self, socket_file) -> Dict:
+    def handle_dict(self, socket_file: BufferedRWPair) -> Dict:
         num_items = int(socket_file.readline().rstrip(b'\r\n'))
         elements = [self.handle_request(socket_file=socket_file) for _ in range(num_items * 2)]
         return dict(zip(elements[::2], elements[1::2]))
 
-    def handle_set(self, socket_file) -> Set:
+    def handle_set(self, socket_file: BufferedRWPair) -> Set:
         return set(self.handle_array(socket_file=socket_file))
