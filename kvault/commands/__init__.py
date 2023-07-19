@@ -5,9 +5,7 @@ import time
 import os
 import pickle
 import datetime
-from ..types import Value
 from ..exceptions import CommandError, ClientQuit, Shutdown
-# from .commands import BaseCommand, QUEUE
 from ..types import Value
 from ..utils import enforce_datatype, decode
 
@@ -15,6 +13,7 @@ KV = 0
 HASH = 1
 QUEUE = 2
 SET = 3
+
 
 class Commands(object):
     def __init__(self, kv: Optional[Dict[AnyStr, Value]], expiry_map: Dict, expiry: List, schedule: List):

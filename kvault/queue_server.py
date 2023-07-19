@@ -1,4 +1,4 @@
-from typing import Dict, Callable, AnyStr
+from typing import Dict, Callable, AnyStr, Union
 import time
 from io import BufferedRWPair
 from gevent.pool import Pool
@@ -9,7 +9,6 @@ from .protocol_handler import ProtocolHandler
 from .types import basestring, Value, unicode
 from .utils import decode
 from .utils.mixins import MetaUtils
-# from .commands import QueueCommands, KvCommands, HashCommands, SetCommands, MiscCommands, ScheduleCommands
 from .commands import Commands
 
 KV = 0
@@ -40,27 +39,25 @@ class QueueServer(Commands, MetaUtils):
         super().__init__(kv=self._kv, expiry_map=self._expiry_map, expiry=self._expiry, schedule=self._schedule)
 
     def connection_handler(self, conn, address):
-        logger.info(f'[${self.name}] Connection received: ${address}')
+        logger.info(f'[{self.name}] Connection received: {address}')
         socket_file = conn.makefile('rwb')
         self._active_connections += 1
         while True:
             try:
                 self.request_response(socket_file)
             except EOFError:
-                logger.info(f'Client went away: ${address}')
+                logger.info(f'Client went away: {address}')
                 socket_file.close()
                 break
             except ClientQuit:
-                logger.info(f'Client exited: ${address}')
+                logger.info(f'Client exited: {address}')
                 break
             except Exception as exc:
-                logger.exception(f'Error processing command: ${exc}', exc)
+                logger.exception(f'Error processing command: {exc}', exc)
         self._active_connections -= 1
 
     def request_response(self, socket_file: BufferedRWPair):
-        logger.debug(f"[${self.name}]#request_response -> socket_file {socket_file}")
         data = self._protocol.handle_request(socket_file)
-        logger.debug(f"[${self.name}]#request_response -> received {data}")
         try:
             resp = self.respond(data)
         except Shutdown:
@@ -81,7 +78,6 @@ class QueueServer(Commands, MetaUtils):
         self._protocol.write_response(socket_file=socket_file, data=resp)
 
     def respond(self, data):
-        logger.debug(f'QueueServer::respond> Received Data: {data}')
         if isinstance(data, str):
             try:
                 data = data.split()
@@ -92,10 +88,10 @@ class QueueServer(Commands, MetaUtils):
 
         command = data[0].upper()
         if command not in self._commands:
-            logger.error(f"[QueueServer] Unrecognized command: {command}")
+            logger.error(f"{self.name} Unrecognized command: {command}")
             raise CommandError(f'Unrecognized command: {command}')
         else:
-            logger.debug('Received %s', decode(command))
+            logger.debug(f'Received command: {decode(command)}')
 
         return self._commands[command](*data[1:])
 
@@ -103,7 +99,7 @@ class QueueServer(Commands, MetaUtils):
         ts = ts or time.time()
         return key in self._expiry_map and ts > self._expiry_map[key]
 
-    def get_commands(self) -> Dict[bytes, Callable]:
+    def get_commands(self) -> Dict[Union[bytes, str], Callable]:
         return dict((
             # Queue commands
             (b'LPUSH', self.lpush),
