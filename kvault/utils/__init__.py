@@ -1,4 +1,4 @@
-from .types import unicode
+from ..types import unicode
 from functools import wraps
 
 

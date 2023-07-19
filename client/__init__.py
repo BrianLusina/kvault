@@ -35,6 +35,7 @@ class Client(object):
     def close(self):
         self.execute(b'QUIT')
 
+    @staticmethod
     def command(cmd):
         def method(self, *args):
             return self.execute(cmd.encode('utf-8'), *args)

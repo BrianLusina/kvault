@@ -1,14 +1,16 @@
 import datetime
-from typing import Union, Optional, List, Dict, Set
+from typing import Union, Optional, List, Dict, Set, Any, Callable
 import json
 from io import BytesIO
 from collections import deque
 from .exceptions import Error
 from .types import unicode
 from .utils import encode
+from .utils.mixins import MetaUtils
+from .logger import logger
 
 
-class ProtocolHandler:
+class ProtocolHandler(MetaUtils):
     """
     ProtocolHandler is based on Redis Wire protocol
     Client sends requests as an array of bulk strings.
@@ -50,7 +52,7 @@ class ProtocolHandler:
     """
 
     def __init__(self):
-        self.handlers = {
+        self.handlers: Dict[bytes, Callable] = {
             b'+': self.handle_simple_string,
             b'-': self.handle_error,
             b':': self.handle_integer,
@@ -62,23 +64,26 @@ class ProtocolHandler:
             b'&': self.handle_set,
         }
 
-    def handle_request(self, socket_file):
+    def handle_request(self, socket_file) -> bytes:
         """
         Parse a request from the client into its components parts
-        :param socket_file:
+        :param socket_file: Socket file
         :return:
         """
         first_byte = socket_file.read(1)
         if not first_byte:
+            logger.error(f"[{self.name}] failed to handle request, missing first byte {first_byte}")
             raise EOFError()
 
-        try:
-            return self.handlers[first_byte](socket_file)
-        except KeyError:
+        handler = self.handlers.get(first_byte, None)
+        if handler:
+            return handler(socket_file)
+        else:
+            logger.error(f"{self.name}> failed to handle request, missing value for key {first_byte}")
             rest = socket_file.readline().rstrip(b'\r\n')
             return first_byte + rest
 
-    def write_response(self, socket_file, data):
+    def write_response(self, socket_file, data: Any):
         """
         Serialize the response data and send it to the client
         :param socket_file:
@@ -91,7 +96,7 @@ class ProtocolHandler:
         socket_file.write(buf.getvalue())
         socket_file.flush()
 
-    def _write(self, buf: BytesIO, data):
+    def _write(self, buf: BytesIO, data: Any):
         if isinstance(data, bytes):
             buf.write(b'$%d\r\n%s\r\n' % (len(data), data))
         elif isinstance(data, unicode):
@@ -100,11 +105,11 @@ class ProtocolHandler:
         elif data is True or data is False:
             buf.write(b':%d\r\n' % (1 if data else 0))
         elif isinstance(data, (int, float)):
-            buf.write(b'"%d\r\n' % data)
+            buf.write(b':%d\r\n' % data)
         elif isinstance(data, Error):
             buf.write(b'-%s\r\n' % encode(data.message))
         elif isinstance(data, (list, tuple, deque)):
-            buf.write((b'*%d\r\n' % len(data)))
+            buf.write(b'*%d\r\n' % len(data))
             for item in data:
                 self._write(buf, item)
         elif isinstance(data, dict):
@@ -121,7 +126,7 @@ class ProtocolHandler:
         elif isinstance(data, datetime.datetime):
             self._write(buf, str(data))
 
-    def handle_simple_string(self, socket_file) -> str:
+    def handle_simple_string(self, socket_file) -> bytes:
         return socket_file.readline().rstrip(b'\r\n')
 
     def handle_error(self, socket_file) -> Error:
@@ -141,7 +146,7 @@ class ProtocolHandler:
             return None
         # include the trailing \r\n in count
         length += 2
-        return socket_file.read(length)[::-2]
+        return socket_file.read(length)[:-2]
 
     def handle_unicode(self, socket_file) -> Optional[str]:
         string_ = self.handle_string(socket_file=socket_file)

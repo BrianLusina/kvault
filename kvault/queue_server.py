@@ -1,5 +1,6 @@
-from typing import Dict, Callable, AnyStr
+from typing import Dict, Callable, AnyStr, Union
 import time
+from io import BufferedRWPair
 from gevent.pool import Pool
 from gevent.server import StreamServer
 from .logger import logger
@@ -7,7 +8,8 @@ from .exceptions import ClientQuit, Shutdown, CommandError, Error
 from .protocol_handler import ProtocolHandler
 from .types import basestring, Value, unicode
 from .utils import decode
-from .commands import QueueCommands, KvCommands, HashCommands, SetCommands, MiscCommands, ScheduleCommands
+from .utils.mixins import MetaUtils
+from .commands import Commands
 
 KV = 0
 HASH = 1
@@ -15,50 +17,51 @@ QUEUE = 2
 SET = 3
 
 
-class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscCommands, ScheduleCommands):
+class QueueServer(Commands, MetaUtils):
     def __init__(self, host: str = '127.0.0.1', port: int = 31337, max_clients: int = 1024):
-        self._kv: Dict[AnyStr, Value] = {}
-        self._expiry_map = {}
-        self._expiry = []
-        self._schedule = []
-        super().__init__(kv=self._kv, expiry_map=self._expiry_map, expiry=self._expiry, schedule=self._schedule)
         self._host = host
         self._port = port
         self._max_clients = max_clients
         self._pool = Pool(max_clients)
-        self._server = StreamServer(listener=(self._host, self._port), handle=self.connection_handler)
+        self._server = StreamServer(listener=(self._host, self._port), handle=self.connection_handler, spawn=self._pool)
         self._commands = self.get_commands()
         self._protocol = ProtocolHandler()
 
+        self._kv: Dict[AnyStr, Value] = {}
+        self._schedule = []
+        self._expiry = []
+        self._expiry_map = {}
         self._active_connections = 0
         self._commands_processed = 0
         self._command_errors = 0
         self._connections = 0
 
+        super().__init__(kv=self._kv, expiry_map=self._expiry_map, expiry=self._expiry, schedule=self._schedule)
+
     def connection_handler(self, conn, address):
-        logger.info('Connection received: %s:%s' % address)
+        logger.info(f'[{self.name}] Connection received: {address}')
         socket_file = conn.makefile('rwb')
         self._active_connections += 1
         while True:
             try:
                 self.request_response(socket_file)
             except EOFError:
-                logger.info('Client went away: %s:%s' % address)
+                logger.info(f'Client went away: {address}')
                 socket_file.close()
                 break
             except ClientQuit:
-                logger.info('Client exited: %s:%s.' % address)
+                logger.info(f'Client exited: {address}')
                 break
             except Exception as exc:
-                logger.exception('Error processing command.')
+                logger.exception(f'Error processing command: {exc}', exc)
         self._active_connections -= 1
 
-    def request_response(self, socket_file):
+    def request_response(self, socket_file: BufferedRWPair):
         data = self._protocol.handle_request(socket_file)
         try:
             resp = self.respond(data)
         except Shutdown:
-            logger.info("Shutting down")
+            logger.info(f"[{self.name}] Shutting down...")
             self._protocol.write_response(socket_file=socket_file, data=1)
             raise KeyboardInterrupt
         except ClientQuit:
@@ -68,27 +71,27 @@ class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscComm
             resp = Error(cmd_error.message)
             self._command_errors += 1
         except Exception as err:
-            logger.exception("Unhanded Exception")
-            resp = Error('Unhandled server error')
+            logger.error(f"[{self.name}] Unhanded Exception {err}")
+            resp = Error(f'Unhandled server error: ${err}')
         else:
             self._commands_processed += 1
         self._protocol.write_response(socket_file=socket_file, data=resp)
 
     def respond(self, data):
-        if not isinstance(data, list):
+        if isinstance(data, str):
             try:
                 data = data.split()
             except:
-                raise CommandError('Unrecognized request type.')
+                raise CommandError(f'Unrecognized request type {data}')
         if not isinstance(data[0], basestring):
-            raise CommandError('First parameter must be command name.')
+            raise CommandError(f'First parameter must be command name. Received {data[0]}')
 
         command = data[0].upper()
         if command not in self._commands:
-            logger.error(f"Unrecognized command: {command}")
+            logger.error(f"{self.name} Unrecognized command: {command}")
             raise CommandError(f'Unrecognized command: {command}')
         else:
-            logger.debug('Received %s', decode(command))
+            logger.debug(f'Received command: {decode(command)}')
 
         return self._commands[command](*data[1:])
 
@@ -96,7 +99,7 @@ class QueueServer(QueueCommands, KvCommands, HashCommands, SetCommands, MiscComm
         ts = ts or time.time()
         return key in self._expiry_map and ts > self._expiry_map[key]
 
-    def get_commands(self) -> Dict[bytes, Callable]:
+    def get_commands(self) -> Dict[Union[bytes, str], Callable]:
         return dict((
             # Queue commands
             (b'LPUSH', self.lpush),
