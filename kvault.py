@@ -1,7 +1,7 @@
 import optparse
 import importlib
 from kvault.queue_server import QueueServer
-from kvault.logger import logger
+from kvault.infra.logger import logger
 
 
 def get_option_parser():

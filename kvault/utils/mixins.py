@@ -1,6 +1,3 @@
-from ..logger import logger
-
-
 class MetaUtils:
     """
     Class with helper properties and utilities

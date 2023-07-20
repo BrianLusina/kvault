@@ -107,3 +107,5 @@ print(client.get('key'))  # {'name': 'Charlie', 'pets': ['mickey', 'huey']}
 ```
 
 > A sample of the expected interaction of a client and `kvault` server
+
+##

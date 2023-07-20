@@ -3,7 +3,7 @@ import time
 from io import BufferedRWPair
 from gevent.pool import Pool
 from gevent.server import StreamServer
-from .logger import logger
+from kvault.infra.logger import logger
 from .exceptions import ClientQuit, Shutdown, CommandError, Error
 from .protocol_handler import ProtocolHandler
 from .types import basestring, Value, unicode
