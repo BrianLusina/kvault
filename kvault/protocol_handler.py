@@ -63,15 +63,15 @@ class ProtocolHandler(MetaUtils):
     # pylint: disable-next=missing-function-docstring
     def __init__(self):
         self.handlers: Dict[bytes, Callable] = {
-            b'+': self.handle_simple_string,
-            b'-': self.handle_error,
-            b':': self.handle_integer,
-            b'$': self.handle_string,
-            b'^': self.handle_unicode,
-            b'@': self.handle_json,
-            b'*': self.handle_array,
-            b'%': self.handle_dict,
-            b'&': self.handle_set,
+            b"+": self.handle_simple_string,
+            b"-": self.handle_error,
+            b":": self.handle_integer,
+            b"$": self.handle_string,
+            b"^": self.handle_unicode,
+            b"@": self.handle_json,
+            b"*": self.handle_array,
+            b"%": self.handle_dict,
+            b"&": self.handle_set,
         }
 
     def handle_request(self, socket_file) -> bytes:
@@ -82,15 +82,19 @@ class ProtocolHandler(MetaUtils):
         """
         first_byte = socket_file.read(1)
         if not first_byte:
-            logger.error(f"[{self.name}] failed to handle request, missing first byte {first_byte}")
+            logger.error(
+                f"[{self.name}] failed to handle request, missing first byte {first_byte}"
+            )
             raise EOFError()
 
         handler = self.handlers.get(first_byte, None)
         if handler:
             return handler(socket_file)
         else:
-            logger.error(f"{self.name}> failed to handle request, missing value for key {first_byte}")
-            rest = socket_file.readline().rstrip(b'\r\n')
+            logger.error(
+                f"{self.name}> failed to handle request, missing value for key {first_byte}"
+            )
+            rest = socket_file.readline().rstrip(b"\r\n")
             return first_byte + rest
 
     def write_response(self, socket_file, data: Any):
@@ -113,31 +117,31 @@ class ProtocolHandler(MetaUtils):
         :param data: Data to respond with
         """
         if isinstance(data, bytes):
-            buf.write(b'$%d\r\n%s\r\n' % (len(data), data))
+            buf.write(b"$%d\r\n%s\r\n" % (len(data), data))
         elif isinstance(data, unicode):
-            bdata = data.encode('utf-8')
-            buf.write(b'^%d\r\n%s\r\n' % (len(bdata), bdata))
+            bdata = data.encode("utf-8")
+            buf.write(b"^%d\r\n%s\r\n" % (len(bdata), bdata))
         elif data is True or data is False:
-            buf.write(b':%d\r\n' % (1 if data else 0))
+            buf.write(b":%d\r\n" % (1 if data else 0))
         elif isinstance(data, (int, float)):
-            buf.write(b':%d\r\n' % data)
+            buf.write(b":%d\r\n" % data)
         elif isinstance(data, Error):
-            buf.write(b'-%s\r\n' % encode(data.message))
+            buf.write(b"-%s\r\n" % encode(data.message))
         elif isinstance(data, (list, tuple, deque)):
-            buf.write(b'*%d\r\n' % len(data))
+            buf.write(b"*%d\r\n" % len(data))
             for item in data:
                 self._write(buf, item)
         elif isinstance(data, dict):
-            buf.write(b'%%%d\r\n' % len(data))
+            buf.write(b"%%%d\r\n" % len(data))
             for key in data:
                 self._write(buf, key)
                 self._write(buf, data[key])
         elif isinstance(data, set):
-            buf.write(b'&%d\r\n' % len(data))
+            buf.write(b"&%d\r\n" % len(data))
             for item in data:
                 self._write(buf, item)
         elif data is None:
-            buf.write(b'$-1\r\n')
+            buf.write(b"$-1\r\n")
         elif isinstance(data, datetime.datetime):
             self._write(buf, str(data))
 
@@ -149,7 +153,7 @@ class ProtocolHandler(MetaUtils):
         :param socket_file: file like object to read data.
         :return: data with the carriage-return/line stripped
         """
-        return socket_file.readline().rstrip(b'\r\n')
+        return socket_file.readline().rstrip(b"\r\n")
 
     def handle_error(self, socket_file) -> Error:
         """
@@ -159,7 +163,7 @@ class ProtocolHandler(MetaUtils):
         :param socket_file: file like object to read data.
         :return: data with the carriage-return/line stripped
         """
-        return Error(socket_file.readline().rstrip(b'\r\n'))
+        return Error(socket_file.readline().rstrip(b"\r\n"))
 
     def handle_integer(self, socket_file) -> Union[float, int]:
         """
@@ -169,8 +173,8 @@ class ProtocolHandler(MetaUtils):
         :param socket_file: file like object to read data.
         :return: data with the carriage-return/line stripped
         """
-        number = socket_file.readline().rstrip(b'\r\n')
-        if b'.' in number:
+        number = socket_file.readline().rstrip(b"\r\n")
+        if b"." in number:
             return float(number)
         return int(number)
 
@@ -184,7 +188,7 @@ class ProtocolHandler(MetaUtils):
         case for Nulls(None)
         """
         # read the length ($<length>\r\n)
-        length = int(socket_file.readline().rstrip(b'\r\n'))
+        length = int(socket_file.readline().rstrip(b"\r\n"))
         if length == -1:
             # special case for NULLs
             return None
@@ -195,19 +199,23 @@ class ProtocolHandler(MetaUtils):
     def handle_unicode(self, socket_file) -> Optional[str]:
         string_ = self.handle_string(socket_file=socket_file)
         if string_:
-            return string_.decode('utf-8')
+            return string_.decode("utf-8")
         return None
 
     def handle_json(self, socket_file):
         return json.loads(self.handle_string(socket_file=socket_file))
 
     def handle_array(self, socket_file) -> List:
-        num_elements = int(socket_file.readline().rstrip(b'\r\n'))
-        return [self.handle_request(socket_file=socket_file) for _ in range(num_elements)]
+        num_elements = int(socket_file.readline().rstrip(b"\r\n"))
+        return [
+            self.handle_request(socket_file=socket_file) for _ in range(num_elements)
+        ]
 
     def handle_dict(self, socket_file) -> Dict:
-        num_items = int(socket_file.readline().rstrip(b'\r\n'))
-        elements = [self.handle_request(socket_file=socket_file) for _ in range(num_items * 2)]
+        num_items = int(socket_file.readline().rstrip(b"\r\n"))
+        elements = [
+            self.handle_request(socket_file=socket_file) for _ in range(num_items * 2)
+        ]
         return dict(zip(elements[::2], elements[1::2]))
 
     def handle_set(self, socket_file) -> Set:

@@ -2,25 +2,23 @@
 install:
 	pipenv install
 
-# Runs tests
-test:
-	pytest
-
-# Runs tests with coverage
-test-cover:
-	pytest --cov=kvault tests/
-
-format:
-	black kvault
-
-lint:
+lint: # runs linting
 	pylint kvault
 
-load-test:
-	locust --config .locust.conf
+test: # runs tests
+	pytest
 
-pre-commit-install:
+build: # builds and packages the application
+	poetry build
+
+test-cover: # Runs tests with coverage
+	pytest --cov=kvault tests/
+
+format: # Runs formatting with black
+	black kvault
+
+pre-commit-install: # installs pre commit hooks
 	pre-commit install
 
-pre-commit:
+pre-commit: # runs pre commit hooks
 	pre-commit run --all-files

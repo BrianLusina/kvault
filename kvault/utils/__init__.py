@@ -4,10 +4,10 @@ from functools import wraps
 
 def encode(s):
     if isinstance(s, unicode):
-        return s.encode('utf-8')
+        return s.encode("utf-8")
     elif isinstance(s, bytes):
         return s
-    return str(s).encode('utf-8')
+    return str(s).encode("utf-8")
 
 
 def decode(s):

@@ -4,6 +4,13 @@ version = "0.1.0"
 description = "Simple Miniature key-value datastore"
 authors = ["BrianLusina <12752833+BrianLusina@users.noreply.github.com>"]
 license = "MIT"
+readme = "README.md"
+keywords = ["kvault", "key-value-datastore", "key-value"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -16,6 +23,9 @@ pytest = "^7.4.0"
 black = "^23.7.0"
 pre-commit = "^3.3.3"
 python-dotenv = "^1.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest-cov = "^4.1.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

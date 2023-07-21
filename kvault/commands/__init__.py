@@ -16,7 +16,13 @@ SET = 3
 
 
 class Commands(object):
-    def __init__(self, kv: Optional[Dict[AnyStr, Value]], expiry_map: Dict, expiry: List, schedule: List):
+    def __init__(
+        self,
+        kv: Optional[Dict[AnyStr, Value]],
+        expiry_map: Dict,
+        expiry: List,
+        schedule: List,
+    ):
         self._kv: Dict[AnyStr, Value] = kv
         self._expiry_map = expiry_map
         self._expiry = expiry
@@ -33,9 +39,9 @@ class Commands(object):
         if key in self._kv:
             value = self._kv[key]
             if value.data_type != data_type:
-                raise CommandError('Operation against wrong key type.')
+                raise CommandError("Operation against wrong key type.")
             if subtype is not None and not isinstance(value.value, subtype):
-                raise CommandError('Operation against wrong value type.')
+                raise CommandError("Operation against wrong value type.")
         elif set_missing:
             value = None
             if data_type == HASH:
@@ -45,7 +51,7 @@ class Commands(object):
             elif data_type == SET:
                 value = set()
             elif data_type == KV:
-                value = ''
+                value = ""
             self._kv[key] = Value(data_type, value)
 
     def expire(self, key, nseconds):
@@ -241,7 +247,7 @@ class Commands(object):
                 try:
                     kv_val = Value(kv_val.data_type, kv_val.value + value)
                 except:
-                    raise CommandError('Incompatible data-types')
+                    raise CommandError("Incompatible data-types")
         return self._kv[key].value
 
     def kv_set(self, key, value) -> int:
@@ -466,29 +472,30 @@ class Commands(object):
 
     # ===== Misc Commands
     def _get_state(self):
-        return {'kv': self._kv, 'schedule': self._schedule}
+        return {"kv": self._kv, "schedule": self._schedule}
 
     def _set_state(self, state, merge=False):
         if not merge:
-            self._kv = state['kv']
-            self._schedule = state['schedule']
+            self._kv = state["kv"]
+            self._schedule = state["schedule"]
         else:
+
             def merge(orig, updates):
                 orig.update(updates)
                 return orig
 
-            self._kv = merge(state['kv'], self._kv)
-            self._schedule = state['schedule']
+            self._kv = merge(state["kv"], self._kv)
+            self._schedule = state["schedule"]
 
     def save_to_disk(self, filename):
-        with open(filename, 'wb') as fh:
+        with open(filename, "wb") as fh:
             pickle.dump(self._get_state(), fh, pickle.HIGHEST_PROTOCOL)
         return True
 
     def restore_from_disk(self, filename, merge=False):
         if not os.path.exists(filename):
             return False
-        with open(filename, 'rb') as fh:
+        with open(filename, "rb") as fh:
             state = pickle.load(fh)
         self._set_state(state, merge=merge)
         return True
@@ -497,21 +504,21 @@ class Commands(object):
         return self.restore_from_disk(filename, merge=True)
 
     def client_quit(self):
-        raise ClientQuit('client closed connection')
+        raise ClientQuit("client closed connection")
 
     def shutdown(self):
-        raise Shutdown('shutting down')
+        raise Shutdown("shutting down")
 
     # ===== Scheduled commands
     def _decode_timestamp(self, timestamp):
         timestamp = decode(timestamp)
-        fmt = '%Y-%m-%d %H:%M:%S'
-        if '.' in timestamp:
-            fmt = fmt + '.%f'
+        fmt = "%Y-%m-%d %H:%M:%S"
+        if "." in timestamp:
+            fmt = fmt + ".%f"
         try:
             return datetime.datetime.strptime(timestamp, fmt)
         except ValueError:
-            raise CommandError('Timestamp must be formatted Y-m-d H:M:S')
+            raise CommandError("Timestamp must be formatted Y-m-d H:M:S")
 
     def schedule_add(self, timestamp, data):
         dt = self._decode_timestamp(timestamp)

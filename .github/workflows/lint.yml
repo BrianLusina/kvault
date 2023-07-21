@@ -10,7 +10,11 @@ permissions:
 
 jobs:
   lint:
+    strategy:
+      matrix:
+        python-version: [ '3.10' ]
     name: Lint
-    uses: brianlusina/ci-workflows/github/python-poetry-workflow.yml@main
+    uses: brianlusina/ci-workflows/.github/workflows/python/lint-poetry.yml@main
     with:
-      command: lint
+      command: make lint
+      version: ${{ matrix.python-version }}
