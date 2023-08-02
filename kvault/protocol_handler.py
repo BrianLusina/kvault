@@ -27,37 +27,35 @@ class ProtocolHandler(MetaUtils):
     Data-type | Prefix |  Structure | Example
 
     simple string | "+" | +{simple string}\r\n | +this is a string\r\n
-    Error | "-" | -{error message}\r\n | -Err unknown command "OOPS"\r\n
-    Integer/float | ":" | :{number}\r\n | :12\r\n
-    Binary(or bulk string | "$" | ${number of bytes}\r\n{data}\r\n | $6\r\nfoobar/r/n
-    * "^" - bulk unicode string
-    * "@" - json string (uses bulk string rules)
-    * "*" - array
-    * "%" - dict
-    * "&" - set
-
     Simple strings: "+string content\r\n"  <-- cannot contain newlines
 
+    Error | "-" | -{error message}\r\n | -Err unknown command "OOPS"\r\n
     Error: "-Error message\r\n"
 
+    Integer/float | ":" | :{number}\r\n | :12\r\n
     Integers: ":1337\r\n"
 
+    Binary(or bulk string | "$" | ${number of bytes}\r\n{data}\r\n | $6\r\nfoobar/r/n
     Bulk String: "$number of bytes\r\nstring data\r\n"
 
-    * Empty string: "$0\r\n\r\n"
-    * NULL: "$-1\r\n"
-
+    Unicode string(or bulk unicode string) | "^" | ^\r\n{data} | ^\r\nfoobar
     Bulk unicode string (encoded as UTF-8): "^number of bytes\r\ndata\r\n"
 
-    JSON string: "@number of bytes\r\nJSON string\r\n"
+    Json string(uses bulk string rules) | '@' | @number of bytes\r\nJSON string\r\n |
 
-    Array: "*number of elements\r\n...elements..."
+    Array | "*" | "*number of elements\r\n...elements..." |
+    *3\r\n+a simple string element\r\n:12345\r\n$7\r\ntesting\r\n
+    Empty array: "*0\r\n"
 
-    * Empty array: "*0\r\n"
-
+    Dictionary | "%" | %{number of keys}\r\n{0 or more of above}\r\n |
+    %3\r\n+key1\r\n+value1\r\n+key2\r\n*2\r\n+value2-0\r\n+value2-1\r\n:3\r\n$7\r\ntesting\r\n
     Dictionary: "%number of elements\r\n...key0...value0...key1...value1..\r\n"
 
-    Set: "&number of elements\r\n...elements..."
+    Set | "&" | "&number of elements\r\n...elements..."
+
+    Other types:
+    NULL: "$-1\r\n"
+    Empty string: "$0\r\n\r\n"
     """
 
     # pylint: disable-next=missing-function-docstring
@@ -90,12 +88,11 @@ class ProtocolHandler(MetaUtils):
         handler = self.handlers.get(first_byte, None)
         if handler:
             return handler(socket_file)
-        else:
-            logger.error(
-                f"{self.name}> failed to handle request, missing value for key {first_byte}"
-            )
-            rest = socket_file.readline().rstrip(b"\r\n")
-            return first_byte + rest
+        logger.error(
+            f"{self.name}> failed to handle request, missing value for key {first_byte}"
+        )
+        rest = socket_file.readline().rstrip(b"\r\n")
+        return first_byte + rest
 
     def write_response(self, socket_file, data: Any):
         """
@@ -109,6 +106,7 @@ class ProtocolHandler(MetaUtils):
         socket_file.write(buf.getvalue())
         socket_file.flush()
 
+    # pylint: disable-next=too-many-branches
     def _write(self, buf: BytesIO, data: Any):
         """
         Handle serialization of responses on a buffer to the client. This is used by the server when responding to the
@@ -197,21 +195,48 @@ class ProtocolHandler(MetaUtils):
         return socket_file.read(length)[:-2]
 
     def handle_unicode(self, socket_file) -> Optional[str]:
+        """
+        Handles unicode characters which in this case calls on the handle_string method to handle the string.
+        The format looks the same
+        :param socket_file:: File like object to read data
+        :return: Optional string
+        """
         string_ = self.handle_string(socket_file=socket_file)
         if string_:
             return string_.decode("utf-8")
         return None
 
-    def handle_json(self, socket_file):
+    def handle_json(self, socket_file) -> Any:
+        """
+        Handles JSON string (uses bulk string rules). This uses the handler handle_string
+        :param socket_file: File like object to read data
+        :return: Python object
+        """
         return json.loads(self.handle_string(socket_file=socket_file))
 
-    def handle_array(self, socket_file) -> List:
+    def handle_array(self, socket_file) -> List[Any]:
+        """
+        Handles array deserialization. Format that is expected has this format "*number of elements\r\n...elements..."
+        where the * prefix is expected. For example: *3\r\n+a simple string element\r\n:12345\r\n$7\r\ntesting\r\n
+        :param socket_file: File like object
+        :return: list of serialized objects
+        """
         num_elements = int(socket_file.readline().rstrip(b"\r\n"))
         return [
             self.handle_request(socket_file=socket_file) for _ in range(num_elements)
         ]
 
-    def handle_dict(self, socket_file) -> Dict:
+    def handle_dict(self, socket_file) -> Dict[Any, Any]:
+        """
+        Handles serialization/deserialization of dictionary type. The format looks like
+        %{number of keys}\r\n{0 or more of above}\r\n
+
+        where the % prefix is expected.
+
+        For example: %3\r\n+key1\r\n+value1\r\n+key2\r\n*2\r\n+value2-0\r\n+value2-1\r\n:3\r\n$7\r\ntesting\r\n
+        :param socket_file: File like object
+        :return: Dictionary or key value pairs
+        """
         num_items = int(socket_file.readline().rstrip(b"\r\n"))
         elements = [
             self.handle_request(socket_file=socket_file) for _ in range(num_items * 2)
@@ -219,4 +244,10 @@ class ProtocolHandler(MetaUtils):
         return dict(zip(elements[::2], elements[1::2]))
 
     def handle_set(self, socket_file) -> Set:
+        """
+        Handle set serialization/deserialization of set objects. This uses the handle_array function and casts this to
+        a set
+        :param socket_file: File like object
+        :return: set data structure
+        """
         return set(self.handle_array(socket_file=socket_file))
