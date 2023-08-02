@@ -17,7 +17,7 @@ jobs:
       matrix:
         python-version: [ '3.10' ]
     name: Lint
-    uses: brianlusina/ci-workflows/.github/workflows/python-poetry-build.yml@main
+    uses: BrianLusina/ci-workflows/.github/workflows/python-poetry-build.yml@main
     with:
       command: make build
       version: ${{ matrix.python-version }}

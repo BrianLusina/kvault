@@ -1,4 +1,10 @@
+"""
+KVault server that is used by the clients to send commands. The QueueServer has the same implementation of the protocol
+handler that clients use to parse and send commands. The queue server uses the protocol handler to serialize &
+deserialize the messages
+"""
 from typing import Dict, Callable, AnyStr, Union
+from dataclasses import dataclass
 import time
 from io import BufferedRWPair
 from gevent.pool import Pool
@@ -17,16 +23,48 @@ QUEUE = 2
 SET = 3
 
 
+@dataclass
+class Counter:
+    """
+    Counter contains the counts tracked by the QueueServer.
+    :cvar active_connections is the number of current active connections to the queue server
+    :cvar commands_processed is the number of commands that the server has processed
+    :cvar command_errors is the count of errors encountered by the server
+    :cvar connections is the number of connections to the server
+    """
+    active_connections: int = 0
+    commands_processed: int = 0
+    command_errors: int = 0
+    connections: int = 0
+
+
+@dataclass
+class ServerInfo:
+    """
+    Counter contains the Server information
+    :cvar host is the host the server will run on
+    :cvar port is the port the server will run on
+    :cvar max_clients is the maximum number of clients that the server will accept connections from
+    """
+    host: str = "127.0.0.1"
+    port: int = 31337
+    max_clients: int = 1024
+
+
 class QueueServer(Commands, MetaUtils):
+    # pylint: disable-next=missing-function-docstring
     def __init__(
-        self, host: str = "127.0.0.1", port: int = 31337, max_clients: int = 1024
+            self, host: str = "127.0.0.1", port: int = 31337, max_clients: int = 1024
     ):
-        self._host = host
-        self._port = port
-        self._max_clients = max_clients
+        self._server_info = ServerInfo(
+            host=host,
+            port=port,
+            max_clients=max_clients
+        )
+
         self._pool = Pool(max_clients)
         self._server = StreamServer(
-            listener=(self._host, self._port),
+            listener=(self._server_info.host, self._server_info.port),
             handle=self.connection_handler,
             spawn=self._pool,
         )
@@ -37,10 +75,13 @@ class QueueServer(Commands, MetaUtils):
         self._schedule = []
         self._expiry = []
         self._expiry_map = {}
-        self._active_connections = 0
-        self._commands_processed = 0
-        self._command_errors = 0
-        self._connections = 0
+
+        self._counter = Counter(
+            active_connections=0,
+            commands_processed=0,
+            command_errors=0,
+            connections=0
+        )
 
         super().__init__(
             kv=self._kv,
@@ -52,7 +93,7 @@ class QueueServer(Commands, MetaUtils):
     def connection_handler(self, conn, address):
         logger.info(f"[{self.name}] Connection received: {address}")
         socket_file = conn.makefile("rwb")
-        self._active_connections += 1
+        self._counter.active_connections += 1
         while True:
             try:
                 self.request_response(socket_file)
@@ -65,7 +106,7 @@ class QueueServer(Commands, MetaUtils):
                 break
             except Exception as exc:
                 logger.exception(f"Error processing command: {exc}", exc)
-        self._active_connections -= 1
+        self._counter.active_connections -= 1
 
     def request_response(self, socket_file: BufferedRWPair):
         data = self._protocol.handle_request(socket_file)
@@ -80,12 +121,12 @@ class QueueServer(Commands, MetaUtils):
             raise
         except CommandError as cmd_error:
             resp = Error(cmd_error.message)
-            self._command_errors += 1
+            self._counter.command_errors += 1
         except Exception as err:
             logger.error(f"[{self.name}] Unhanded Exception {err}")
             resp = Error(f"Unhandled server error: ${err}")
         else:
-            self._commands_processed += 1
+            self._counter.commands_processed += 1
         self._protocol.write_response(socket_file=socket_file, data=resp)
 
     def respond(self, data):
@@ -194,10 +235,10 @@ class QueueServer(Commands, MetaUtils):
 
     def info(self) -> Dict:
         return {
-            "active_connections": self._active_connections,
-            "commands_processed": self._commands_processed,
-            "command_errors": self._command_errors,
-            "connections": self._connections,
+            "active_connections": self._counter.active_connections,
+            "commands_processed": self._counter.commands_processed,
+            "command_errors": self._counter.command_errors,
+            "connections": self._counter.connections,
             "keys": len(self._kv),
             "timestamp": time.time(),
         }
