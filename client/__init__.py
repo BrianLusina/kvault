@@ -1,6 +1,9 @@
+import logging
 from kvault.protocol_handler import ProtocolHandler
 from kvault.socket_pool import SocketPool
 from kvault.exceptions import ServerDisconnect, ServerInternalError, CommandError, Error
+
+logger = logging.getLogger(__name__)
 
 
 class Client(object):
@@ -29,6 +32,7 @@ class Client(object):
             else:
                 self._socket_pool.checkin()
         if isinstance(resp, Error):
+            logger.error(f"Received an error {resp.message}")
             raise CommandError(resp.message)
         return resp
 
