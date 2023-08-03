@@ -5,54 +5,21 @@ import time
 import os
 import pickle
 import datetime
+from ..utils.mixins import Guards
+from .queue_commands import QueueCommands
 from ..exceptions import CommandError, ClientQuit, Shutdown
-from ..types import Value
+from ..types import Value, KV, HASH, QUEUE, SET
 from ..utils import enforce_datatype, decode
 
-KV = 0
-HASH = 1
-QUEUE = 2
-SET = 3
 
-
-class Commands(object):
-    def __init__(
-        self,
-        kv: Optional[Dict[AnyStr, Value]],
-        expiry_map: Dict,
-        expiry: List,
-        schedule: List,
-    ):
+class Commands(Guards, QueueCommands):
+    def __init__(self, kv: Optional[Dict[AnyStr, Value]], expiry_map: Dict, expiry: List, schedule: List):
         self._kv: Dict[AnyStr, Value] = kv
         self._expiry_map = expiry_map
         self._expiry = expiry
         self._schedule = schedule
 
-    def check_expired(self, key, ts=None):
-        ts = ts or time.time()
-        return key in self._expiry_map and ts > self._expiry_map[key]
-
-    def check_datatype(self, data_type, key, set_missing=True, subtype=None):
-        if key in self._kv and self.check_expired(key):
-            del self._kv[key]
-
-        if key in self._kv:
-            value = self._kv[key]
-            if value.data_type != data_type:
-                raise CommandError("Operation against wrong key type.")
-            if subtype is not None and not isinstance(value.value, subtype):
-                raise CommandError("Operation against wrong value type.")
-        elif set_missing:
-            value = None
-            if data_type == HASH:
-                value = {}
-            elif data_type == QUEUE:
-                value = deque()
-            elif data_type == SET:
-                value = set()
-            elif data_type == KV:
-                value = ""
-            self._kv[key] = Value(data_type, value)
+        super().__init__(self._kv, self._expiry_map)
 
     def expire(self, key, nseconds):
         eta = time.time() + nseconds
@@ -73,86 +40,6 @@ class Commands(object):
                 del self._kv[key]
                 n += 1
         return n
-
-    # Queue commands
-    @enforce_datatype(QUEUE)
-    def lpush(self, key, *values):
-        self._kv[key].value.extendleft(values)
-        return len(values)
-
-    @enforce_datatype(QUEUE)
-    def rpush(self, key, *values):
-        self._kv[key].value.extend(values)
-        return len(values)
-
-    @enforce_datatype(QUEUE)
-    def lpop(self, key):
-        try:
-            return self._kv[key].value.popleft()
-        except IndexError:
-            pass
-
-    @enforce_datatype(QUEUE)
-    def rpop(self, key):
-        try:
-            return self._kv[key].value.pop()
-        except IndexError:
-            pass
-
-    @enforce_datatype(QUEUE)
-    def lrem(self, key, value):
-        try:
-            self._kv[key].value.remove(value)
-        except ValueError:
-            return 0
-        else:
-            return 1
-
-    @enforce_datatype(QUEUE)
-    def llen(self, key):
-        return len(self._kv[key].value)
-
-    @enforce_datatype(QUEUE)
-    def lindex(self, key, idx):
-        try:
-            return self._kv[key].value[idx]
-        except IndexError:
-            pass
-
-    @enforce_datatype(QUEUE)
-    def lset(self, key, idx, value):
-        try:
-            self._kv[key].value[idx] = value
-        except IndexError:
-            return 0
-        else:
-            return 1
-
-    @enforce_datatype(QUEUE)
-    def ltrim(self, key, start, stop):
-        trimmed = list(self._kv[key].value)[start:stop]
-        self._kv[key] = Value(QUEUE, deque(trimmed))
-        return len(trimmed)
-
-    @enforce_datatype(QUEUE)
-    def rpoplpush(self, src, dest):
-        self.check_datatype(QUEUE, dest, set_missing=True)
-        try:
-            self._kv[dest].value.appendleft(self._kv[src].value.pop())
-        except IndexError:
-            return 0
-        else:
-            return 1
-
-    @enforce_datatype(QUEUE)
-    def lrange(self, key, start, end=None):
-        return list(self._kv[key].value)[start:end]
-
-    @enforce_datatype(QUEUE)
-    def lflush(self, key):
-        qlen = len(self._kv[key].value)
-        self._kv[key].value.clear()
-        return qlen
 
     # ==== Hash Commands
     @enforce_datatype(HASH)
@@ -510,15 +397,15 @@ class Commands(object):
         raise Shutdown("shutting down")
 
     # ===== Scheduled commands
-    def _decode_timestamp(self, timestamp):
-        timestamp = decode(timestamp)
+    def _decode_timestamp(self, timestamp) -> datetime:
+        timestamp_ = decode(timestamp)
         fmt = "%Y-%m-%d %H:%M:%S"
-        if "." in timestamp:
+        if "." in timestamp_:
             fmt = fmt + ".%f"
         try:
-            return datetime.datetime.strptime(timestamp, fmt)
+            return datetime.datetime.strptime(timestamp_, fmt)
         except ValueError:
-            raise CommandError("Timestamp must be formatted Y-m-d H:M:S")
+            raise CommandError(f"Timestamp {timestamp} must be formatted Y-m-d H:M:S")
 
     def schedule_add(self, timestamp, data):
         dt = self._decode_timestamp(timestamp)

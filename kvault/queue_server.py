@@ -3,8 +3,8 @@ KVault server that is used by the clients to send commands. The QueueServer has 
 handler that clients use to parse and send commands. The queue server uses the protocol handler to serialize &
 deserialize the messages
 """
-from typing import Dict, Callable, AnyStr, Union
-from dataclasses import dataclass
+from typing import Dict, Callable, AnyStr, Union, Any, List, Tuple
+from dataclasses import dataclass, field
 import time
 from io import BufferedRWPair
 from gevent.pool import Pool
@@ -16,11 +16,6 @@ from .types import basestring, Value, unicode
 from .utils import decode
 from .utils.mixins import MetaUtils
 from .commands import Commands
-
-KV = 0
-HASH = 1
-QUEUE = 2
-SET = 3
 
 
 @dataclass
@@ -51,7 +46,27 @@ class ServerInfo:
     max_clients: int = 1024
 
 
+@dataclass
+class ServerState:
+    """
+    Contains the server state
+    :cvar kv is the in memory Key Value store
+    :cvar schedule contains a list of tuples of scheduled commands
+    :cvar expiry
+    :cvar expiry_map a key value pair where the key is the expiry time and the value is the value. This contains the
+    expired data
+    """
+    kv: Dict[AnyStr, Value] = field(default_factory=dict)
+    schedule: List[Tuple[Any, Any]] = field(default_factory=list)
+    expiry: List[Tuple[float, Any]] = field(default_factory=list)
+    expiry_map: Dict[Any, float] = field(default_factory=dict)
+
+
 class QueueServer(Commands, MetaUtils):
+    """
+    Queue Server where server send commands to
+    """
+
     # pylint: disable-next=missing-function-docstring
     def __init__(
             self, host: str = "127.0.0.1", port: int = 31337, max_clients: int = 1024
@@ -71,10 +86,12 @@ class QueueServer(Commands, MetaUtils):
         self._commands = self.get_commands()
         self._protocol = ProtocolHandler()
 
-        self._kv: Dict[AnyStr, Value] = {}
-        self._schedule = []
-        self._expiry = []
-        self._expiry_map = {}
+        self._server_state = ServerState(
+            kv={},
+            schedule=[],
+            expiry=[],
+            expiry_map={}
+        )
 
         self._counter = Counter(
             active_connections=0,
@@ -84,10 +101,10 @@ class QueueServer(Commands, MetaUtils):
         )
 
         super().__init__(
-            kv=self._kv,
-            expiry_map=self._expiry_map,
-            expiry=self._expiry,
-            schedule=self._schedule,
+            kv=self._server_state.kv,
+            expiry_map=self._server_state.expiry_map,
+            expiry=self._server_state.expiry,
+            schedule=self._server_state.schedule,
         )
 
     def connection_handler(self, conn, address):
@@ -149,11 +166,15 @@ class QueueServer(Commands, MetaUtils):
 
         return self._commands[command](*data[1:])
 
-    def check_expired(self, key, ts=None):
+    def check_expired(self, key, ts=None) -> bool:
         ts = ts or time.time()
-        return key in self._expiry_map and ts > self._expiry_map[key]
+        return key in self._server_state.expiry_map and ts > self._server_state.expiry_map[key]
 
     def get_commands(self) -> Dict[Union[bytes, str], Callable]:
+        """
+        Returns a mapping of commands to handlers
+        :return: Dictionary of commands to handlers
+        """
         return dict(
             (
                 # Queue commands

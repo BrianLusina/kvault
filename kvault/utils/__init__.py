@@ -10,7 +10,7 @@ def encode(s):
     return str(s).encode("utf-8")
 
 
-def decode(s):
+def decode(s) -> str:
     if isinstance(s, unicode):
         return s
     elif isinstance(s, bytes):
