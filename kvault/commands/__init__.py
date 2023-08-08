@@ -38,25 +38,25 @@ class Commands(Guards):
         self._expiry_map[key] = eta
         heapq.heappush(self._expiry, (eta, key))
 
-    def clean_expired(self, ts=None):
+    def clean_expired(self, timestamp=None):
         """
         Performs cleanup of the expired keys
-        :param ts: timestimp to check against expired keys
+        :param timestamp: timestamp to check against expired keys
         :return: Number of cleanups performed
         """
-        ts = ts or time.time()
-        n = 0
+        _timestamp = timestamp or time.time()
+        cleanup_count = 0
         while self._expiry:
             expires, key = heapq.heappop(self._expiry)
-            if expires > ts:
+            if expires > _timestamp:
                 heapq.heappush(self._expiry, (expires, key))
                 break
 
             if self._expiry_map.get(key) == expires:
                 del self._expiry_map[key]
                 del self._kv[key]
-                n += 1
-        return n
+                cleanup_count += 1
+        return cleanup_count
 
     ## Queue commands
     @enforce_datatype(QUEUE)
@@ -91,8 +91,8 @@ class Commands(Guards):
         """
         try:
             return self._kv[key].value.popleft()
-        except IndexError as ie:
-            raise CommandError(f"Failed to find key with error {ie}. Key {key} does not exist")
+        except KeyError as key_error:
+            raise CommandError(f"Failed to find key with error {key_error}. Key {key} does not exist") from key_error
 
     @enforce_datatype(QUEUE)
     def rpop(self, key) -> Any:
@@ -104,8 +104,8 @@ class Commands(Guards):
         """
         try:
             return self._kv[key].value.pop()
-        except IndexError as ie:
-            raise CommandError(f"Failed to find key with error {ie}. Key {key} does not exist")
+        except KeyError as error:
+            raise CommandError(f"Failed to find key with error {error}. Key {key} does not exist") from error
 
     @enforce_datatype(QUEUE)
     def lrem(self, key, value) -> int:
@@ -119,8 +119,7 @@ class Commands(Guards):
             self._kv[key].value.remove(value)
         except ValueError:
             return 0
-        else:
-            return 1
+        return 1
 
     @enforce_datatype(QUEUE)
     def llen(self, key) -> int:
@@ -142,8 +141,8 @@ class Commands(Guards):
         """
         try:
             return self._kv[key].value[idx]
-        except IndexError as ie:
-            raise CommandError(f"Failed to find key with error {ie}. Key {key} does not exist")
+        except KeyError as error:
+            raise CommandError(f"Failed to find key with error {error}. Key {key} does not exist") from error
 
     @enforce_datatype(QUEUE)
     def lset(self, key, idx, value):
@@ -156,10 +155,9 @@ class Commands(Guards):
         """
         try:
             self._kv[key].value[idx] = value
-        except IndexError:
+        except KeyError:
             return 0
-        else:
-            return 1
+        return 1
 
     @enforce_datatype(QUEUE)
     def ltrim(self, key, start, stop):
@@ -176,8 +174,8 @@ class Commands(Guards):
             trimmed = list(self._kv[key].value)[start:stop]
             self._kv[key] = Value(QUEUE, deque(trimmed))
             return len(trimmed)
-        except IndexError as ie:
-            raise CommandError(f"Failed to find key with error {ie}. Key {key} does not exist")
+        except KeyError as error:
+            raise CommandError(f"Failed to find key with error {error}. Key {key} does not exist") from error
 
     @enforce_datatype(QUEUE)
     def rpoplpush(self, src, dest):
@@ -191,10 +189,9 @@ class Commands(Guards):
         self.check_datatype(QUEUE, dest, set_missing=True)
         try:
             self._kv[dest].value.appendleft(self._kv[src].value.pop())
-        except IndexError:
+        except KeyError:
             return 0
-        else:
-            return 1
+        return 1
 
     @enforce_datatype(QUEUE)
     def lrange(self, key, start, end=None):
@@ -208,8 +205,8 @@ class Commands(Guards):
         """
         try:
             return list(self._kv[key].value)[start:end]
-        except IndexError as ie:
-            raise CommandError(f"Failed to find key with error {ie}. Key {key} does not exist")
+        except KeyError as error:
+            raise CommandError(f"Failed to find key with error {error}. Key {key} does not exist") from error
 
     @enforce_datatype(QUEUE)
     def lflush(self, key):
@@ -223,8 +220,8 @@ class Commands(Guards):
             qlen = len(self._kv[key].value)
             self._kv[key].value.clear()
             return qlen
-        except IndexError as ie:
-            raise CommandError(f"Failed to find key with error {ie}. Key {key} does not exist")
+        except KeyError as error:
+            raise CommandError(f"Failed to find key with error {error}. Key {key} does not exist") from error
 
     ## Hash commands
     @enforce_datatype(HASH)
@@ -241,8 +238,8 @@ class Commands(Guards):
                 del value[field]
                 return 1
             return 0
-        except KeyError as ke:
-            raise CommandError(f"Key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"Key {key} does not exist. Error: {error}") from error
 
     @enforce_datatype(HASH)
     def hexists(self, key, field) -> int:
@@ -256,8 +253,8 @@ class Commands(Guards):
         try:
             value = self._kv[key].value
             return 1 if field in value else 0
-        except KeyError as ke:
-            raise CommandError(f"key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"key {key} does not exist. Error: {error}") from error
 
     @enforce_datatype(HASH)
     def hget(self, key, field) -> Any:
@@ -269,8 +266,8 @@ class Commands(Guards):
         """
         try:
             return self._kv[key].value.get(field)
-        except KeyError as ke:
-            raise CommandError(f"key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"key {key} does not exist. Error: {error}") from error
 
     @enforce_datatype(HASH)
     def hgetall(self, key) -> Value:
@@ -281,8 +278,8 @@ class Commands(Guards):
         """
         try:
             return self._kv[key].value
-        except KeyError as ke:
-            raise CommandError(f"key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"key {key} does not exist. Error: {error}") from error
 
     @enforce_datatype(HASH)
     def hincrby(self, key, field, incr=1) -> Value:
@@ -298,8 +295,8 @@ class Commands(Guards):
             self._kv[key].value.setdefault(field, 0)
             self._kv[key].value[field] += incr
             return self._kv[key].value[field]
-        except KeyError as ke:
-            raise CommandError(f"key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"key {key} does not exist. Error: {error}") from error
 
     @enforce_datatype(HASH)
     def hkeys(self, key) -> List[Value]:
@@ -310,8 +307,8 @@ class Commands(Guards):
         """
         try:
             return list(self._kv[key].value)
-        except KeyError as ke:
-            raise CommandError(f"key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"key {key} does not exist. Error: {error}") from error
 
     @enforce_datatype(HASH)
     def hlen(self, key) -> int:
@@ -322,8 +319,8 @@ class Commands(Guards):
         """
         try:
             return len(self._kv[key].value)
-        except KeyError as ke:
-            raise CommandError(f"key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"key {key} does not exist. Error: {error}") from error
 
     @enforce_datatype(HASH)
     def hmget(self, key, *fields) -> Dict:
@@ -339,8 +336,8 @@ class Commands(Guards):
             for field in fields:
                 accum[field] = value.get(field)
             return accum
-        except KeyError as ke:
-            raise CommandError(f"key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"key {key} does not exist. Error: {error}") from error
 
     @enforce_datatype(HASH)
     def hmset(self, key, data) -> int:
@@ -353,8 +350,8 @@ class Commands(Guards):
         try:
             self._kv[key].value.update(data)
             return len(data)
-        except KeyError as ke:
-            raise CommandError(f"key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"key {key} does not exist. Error: {error}") from error
 
     @enforce_datatype(HASH)
     def hset(self, key, field, value) -> int:
@@ -368,8 +365,8 @@ class Commands(Guards):
         try:
             self._kv[key].value[field] = value
             return 1
-        except KeyError as ke:
-            raise CommandError(f"key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"key {key} does not exist. Error: {error}") from error
 
     @enforce_datatype(HASH)
     def hsetnx(self, key, field, value) -> int:
@@ -388,8 +385,8 @@ class Commands(Guards):
                 kval[field] = value
                 return 1
             return 0
-        except KeyError as ke:
-            raise CommandError(f"key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"key {key} does not exist. Error: {error}") from error
 
     @enforce_datatype(HASH)
     def hvals(self, key) -> List:
@@ -400,8 +397,8 @@ class Commands(Guards):
         """
         try:
             return list(self._kv[key].value.values())
-        except KeyError as ke:
-            raise CommandError(f"key {key} does not exist. Error: {ke}")
+        except KeyError as error:
+            raise CommandError(f"key {key} does not exist. Error: {error}") from error
 
     # ==== KV Commands
     def unexpire(self, key):
@@ -411,17 +408,17 @@ class Commands(Guards):
         """
         self._expiry_map.pop(key, None)
 
-    def _kv_incr(self, key, n) -> Union[Value, Any]:
+    def _kv_incr(self, key, delta: int) -> Union[Value, Any]:
         """
         Increments the key's value by n. If the key does not exist a new key value is created and they key is returned
         :param key: Key
-        :param n: Delta to increase the value by
+        :param delta: Delta to increase the value by
         :return: Either an updated value or a new value
         """
         if key in self._kv:
-            value = self._kv[key].value + n
+            value = self._kv[key].value + delta
         else:
-            value = n
+            value = delta
         self._kv[key] = Value(KV, value)
         return value
 
@@ -445,8 +442,8 @@ class Commands(Guards):
                 try:
                     kv_val = Value(kv_val.data_type, kv_val.value + value)
                     self._kv[key] = kv_val
-                except:
-                    raise CommandError(f"Incompatible data-types {value}")
+                except Exception as error:
+                    raise CommandError(f"Incompatible data-types {value}") from error
         return self._kv[key].value
 
     def kv_set(self, key, value) -> int:
@@ -475,17 +472,17 @@ class Commands(Guards):
         Decrements a key's value by 1
         :param key: key to decrement.
         """
-        return self._kv_incr(key=key, n=-1)
+        return self._kv_incr(key=key, delta=-1)
 
     @enforce_datatype(KV, set_missing=False, subtype=(float, int))
-    def kv_decrby(self, key, n: Union[float, int]):
+    def kv_decrby(self, key, delta: Union[float, int]):
         """
         Decrements a key's value by a set amount n
         :param key: key to decrement
-        :param n: Value to decrement key by
+        :param delta: Value to decrement key by
         :return:
         """
-        return self._kv_incr(key=key, n=-1 * n)
+        return self._kv_incr(key=key, delta=-1 * delta)
 
     def kv_delete(self, key) -> int:
         """
@@ -514,6 +511,7 @@ class Commands(Guards):
         """
         if key in self._kv and not self.check_expired(key):
             return self._kv[key].value
+        return None
 
     def kv_getset(self, key, value) -> Optional[Value]:
         """
@@ -539,13 +537,13 @@ class Commands(Guards):
         return self._kv_incr(key, 1)
 
     @enforce_datatype(KV, set_missing=False, subtype=(float, int))
-    def kv_incrby(self, key, n):
+    def kv_incrby(self, key, delta):
         """
         Increments the value of a key by n
         :param key: key to increment
-        :param n: delta to increment the value by
+        :param delta: delta to increment the value by
         """
-        return self._kv_incr(key, n)
+        return self._kv_incr(key, delta)
 
     def kv_mdelete(self, *keys):
         """
@@ -553,15 +551,15 @@ class Commands(Guards):
         :param keys: Keys to delete
         :return: number of keys deleted
         """
-        n = 0
+        deleted_key_count = 0
         for key in keys:
             try:
                 del self._kv[key]
             except KeyError:
                 pass
             else:
-                n += 1
-        return n
+                deleted_key_count += 1
+        return deleted_key_count
 
     def kv_mget(self, *keys) -> List[Optional[Value]]:
         """
@@ -605,18 +603,18 @@ class Commands(Guards):
         :param kwargs: Additional key value pairs to add
         :return: number of updates performed
         """
-        n = 0
+        update_count = 0
         data = {}
         if __data is not None:
             data.update(__data)
         if kwargs is not None:
             data.update(kwargs)
 
-        for key in data:
-            self.unexpire(key)
-            self._kv[key] = Value(KV, data[key])
-            n += 1
-        return n
+        for key_, _ in data.items():
+            self.unexpire(key_)
+            self._kv[key_] = Value(KV, data[key_])
+            update_count += 1
+        return update_count
 
     def kv_msetex(self, data: Dict, expires: Union[float, int]):
         """
@@ -628,27 +626,53 @@ class Commands(Guards):
         for key in data:
             self.expire(key, expires)
 
-    def kv_pop(self, key):
+    def kv_pop(self, key) -> Optional[Value]:
+        """
+        Pops a key if the key is available and if it has expired
+        :param key: Key to pop.
+        :return: The value of the popped key
+        """
         if key in self._kv and not self.check_expired(key):
             return self._kv.pop(key).value
+        return None
 
     def kv_setnx(self, key, value) -> int:
+        """
+        Sets a value of a key if it's not available and has not expired.
+        :param key: Key to add
+        :param value: Value of key
+        :return: 1 if the key is added, 0 if no operation is performed
+        """
         if key in self._kv and not self.check_expired(key):
             return 0
-        else:
-            self.unexpire(key)
-            self._kv[key] = Value(KV, value)
-            return 1
+        self.unexpire(key)
+        self._kv[key] = Value(KV, value)
+        return 1
 
-    def kv_setex(self, key, value, expires) -> int:
+    def kv_setex(self, key: Any, value: Value, expires: Union[float, int]) -> int:
+        """
+        Sets the value of a key and the expiry of the key.
+        :param key: Key to set
+        :param value: Value of the key
+        :param expires: Expiry time of the key
+        :return:
+        """
         self.kv_set(key, value)
         self.expire(key, expires)
         return 1
 
     def kv_len(self) -> int:
+        """
+        Returns the length of the keys
+        :return: length of the keys.
+        """
         return len(self._kv)
 
     def kv_flush(self) -> int:
+        """
+        Clears the keys, expiry and expiry_map and returns the original length of the keys.
+        :return: length of the original key
+        """
         kvlen = self.kv_len()
         self._kv.clear()
         self._expiry = []
@@ -658,61 +682,137 @@ class Commands(Guards):
     # ====== Set Commands
     @enforce_datatype(SET)
     def sadd(self, key, *members):
-        self._kv[key].value.update(members)
-        return len(self._kv[key].value)
+        """
+        Updates the key with the members
+        :param key: Key to update
+        :param members: members to add.
+        :return: The new length of the key's values
+        """
+        try:
+            self._kv[key].value.update(members)
+            return len(self._kv[key].value)
+        except KeyError as error:
+            raise CommandError(f"Key {key} does not exist {error}") from error
 
     @enforce_datatype(SET)
     def scard(self, key):
+        """
+        Returns the length of the key's values for a set
+        :param key: Key to use
+        :return: length of new key
+        """
         return len(self._kv[key].value)
 
     @enforce_datatype(SET)
-    def sdiff(self, key, *keys):
-        src = set(self._kv[key].value)
-        for key in keys:
-            self.check_datatype(SET, key)
-            src -= self._kv[key].value
-        return list(src)
+    def sdiff(self, key, *keys) -> List:
+        """
+        Returns the difference between the key and the set of keys
+        :param key: Key to use
+        :param keys: set of keys to check.
+        :return: list of the difference between the keys.
+        """
+        try:
+            src = set(self._kv[key].value)
+            for key_ in keys:
+                self.check_datatype(SET, key_)
+                src -= self._kv[key_].value
+            return list(src)
+        except KeyError as error:
+            raise CommandError(f"Key {key} does not exist {error}") from error
 
     @enforce_datatype(SET)
-    def sdiffstore(self, dest, key, *keys):
-        src = set(self._kv[key].value)
-        for key in keys:
-            self.check_datatype(SET, key)
-            src -= self._kv[key].value
-        self.check_datatype(SET, dest)
-        self._kv[dest] = Value(SET, src)
-        return len(src)
+    def sdiffstore(self, dest, key, *keys) -> int:
+        """
+        Finds the difference between the key and as set of keys before setting the value of the key "dest" with the
+        difference from the set.
+        :param dest: Destination key to store values
+        :param key: Key to check for difference
+        :param keys: collection of keys to check for difference
+        :return: length of difference between the keys
+        """
+        try:
+            src = set(self._kv[key].value)
+            for key_ in keys:
+                self.check_datatype(SET, key_)
+                src -= self._kv[key_].value
+            self.check_datatype(SET, dest)
+            self._kv[dest] = Value(SET, src)
+            return len(src)
+        except KeyError as error:
+            raise CommandError(f"Key {key} does not exist {error}") from error
 
     @enforce_datatype(SET)
-    def sinter(self, key, *keys):
-        src = set(self._kv[key].value)
-        for key in keys:
-            self.check_datatype(SET, key)
-            src &= self._kv[key].value
-        return list(src)
+    def sinter(self, key, *keys) -> List:
+        """
+        Checks the intersection between key and set of keys and returns the list
+        :param key: Key
+        :param keys: set of keys to check
+        :return: list of intersection
+        """
+        try:
+            src = set(self._kv[key].value)
+            for key_ in keys:
+                self.check_datatype(SET, key_)
+                src &= self._kv[key_].value
+            return list(src)
+        except KeyError as error:
+            raise CommandError(f"Key {key} does not exist {error}") from error
 
     @enforce_datatype(SET)
-    def sinterstore(self, dest, key, *keys):
-        src = set(self._kv[key].value)
-        for key in keys:
-            self.check_datatype(SET, key)
-            src &= self._kv[key].value
-        self.check_datatype(SET, dest)
-        self._kv[dest] = Value(SET, src)
-        return len(src)
+    def sinterstore(self, dest, key, *keys) -> int:
+        """
+        Checks the intersection between key and keys and stores the intersection in "dest"
+        :param dest: Destination key
+        :param key: Source key
+        :param keys: Set of keys
+        :return: length of intersection
+        """
+        try:
+            src = set(self._kv[key].value)
+            for key_ in keys:
+                self.check_datatype(SET, key_)
+                src &= self._kv[key_].value
+            self.check_datatype(SET, dest)
+            self._kv[dest] = Value(SET, src)
+            return len(src)
+        except KeyError as error:
+            raise CommandError(f"Key {key} does not exist {error}") from error
 
     @enforce_datatype(SET)
     def sismember(self, key, member):
-        return 1 if member in self._kv[key].value else 0
+        """
+        Checks if a member is a member of a key's value.
+        :param key: Key to check
+        :param member: Member to check
+        :return: 1 if member is a member of a set, else returns 0
+        """
+        try:
+            return 1 if member in self._kv[key].value else 0
+        except KeyError as error:
+            raise CommandError(f"Key {key} does not exist {error}") from error
 
     @enforce_datatype(SET)
     def smembers(self, key):
-        return self._kv[key].value
+        """
+        returns the members of a key.
+        :param key: Key to use
+        :return: member values of the key.
+        """
+        try:
+            return self._kv[key].value
+        except KeyError as error:
+            raise CommandError(f"Key {key} does not exist {error}") from error
 
     @enforce_datatype(SET)
-    def spop(self, key, n=1):
+    def spop(self, key, number_to_pop=1) -> List[Value]:
+        """
+        Pops n values from the key and returns them
+        :param key: Key to pop
+        :param number_to_pop: number of values
+        :return: accumulated values
+        """
         accum = []
-        for _ in range(n):
+        for _ in range(number_to_pop):
             try:
                 accum.append(self._kv[key].value.pop())
             except KeyError:
@@ -720,40 +820,74 @@ class Commands(Guards):
         return accum
 
     @enforce_datatype(SET)
-    def srem(self, key, *members):
-        ct = 0
+    def srem(self, key, *members) -> int:
+        """
+        Removes a set of members from the given key's values
+        :param key: Key to remove
+        :param members: set of members
+        :return: number of members removed
+        """
+        remove_count = 0
         for member in members:
             try:
                 self._kv[key].value.remove(member)
             except KeyError:
                 pass
             else:
-                ct += 1
-        return ct
+                remove_count += 1
+        return remove_count
 
     @enforce_datatype(SET)
-    def sunion(self, key, *keys):
-        src = set(self._kv[key].value)
-        for key in keys:
-            self.check_datatype(SET, key)
-            src |= self._kv[key].value
-        return list(src)
+    def sunion(self, key, *keys) -> List:
+        """
+        Returns the union of key and keys
+        :param key: Key to check for union
+        :param keys: Keys to check for union
+        :return: list of union pairs
+        """
+        try:
+            src = set(self._kv[key].value)
+            for key_ in keys:
+                self.check_datatype(SET, key_)
+                src |= self._kv[key_].value
+            return list(src)
+        except KeyError as error:
+            raise CommandError(f"Key {key} does not exist {error}") from error
 
     @enforce_datatype(SET)
-    def sunionstore(self, dest, key, *keys):
-        src = set(self._kv[key].value)
-        for key in keys:
-            self.check_datatype(SET, key)
-            src |= self._kv[key].value
-        self.check_datatype(SET, dest)
-        self._kv[dest] = Value(SET, src)
-        return len(src)
+    def sunionstore(self, dest, key, *keys) -> int:
+        """
+        Gets the union of key and keys and stores it in dest
+        :param dest: Destination key
+        :param key: source key
+        :param keys: Set or collection of keys
+        :return: length of union
+        """
+        try:
+            src = set(self._kv[key].value)
+            for key_ in keys:
+                self.check_datatype(SET, key_)
+                src |= self._kv[key_].value
+            self.check_datatype(SET, dest)
+            self._kv[dest] = Value(SET, src)
+            return len(src)
+        except KeyError as error:
+            raise CommandError(f"Key {key} does not exist {error}") from error
 
     # ===== Misc Commands
-    def _get_state(self):
+    def _get_state(self) -> Dict[str, Any]:
+        """
+        Returns the current state of the store
+        :return: dictionary mapping of state keys to mappings
+        """
         return {"kv": self._kv, "schedule": self._schedule}
 
-    def _set_state(self, state, merge=False):
+    def _set_state(self, state: Dict[str, Any], merge=False):
+        """
+        Sets the state to a new given state
+        :param state: New state
+        :param merge: whether to merge the state with the new state
+        """
         if not merge:
             self._kv = state["kv"]
             self._schedule = state["schedule"]
@@ -766,51 +900,97 @@ class Commands(Guards):
             self._kv = merge(state["kv"], self._kv)
             self._schedule = state["schedule"]
 
-    def save_to_disk(self, filename):
-        with open(filename, "wb") as fh:
-            pickle.dump(self._get_state(), fh, pickle.HIGHEST_PROTOCOL)
+    def save_to_disk(self, filename) -> bool:
+        """
+        Saves the current state to disk given a filename.
+        :param filename: File name to use to save to disk
+        :return: True if operation is successful
+        """
+        with open(filename, "wb") as file_handle:
+            pickle.dump(self._get_state(), file_handle, pickle.HIGHEST_PROTOCOL)
         return True
 
-    def restore_from_disk(self, filename, merge=False):
+    def restore_from_disk(self, filename: str, merge=False):
+        """
+        Restores a file from disk if the file exists. It also performs a merge of the stored state with the current
+        state if the merge argument is set to True
+        :param filename: filename to use
+        :param merge: whether to merge to the new state
+        :return: True if it's possible to merge the state, False otherwise
+        """
         if not os.path.exists(filename):
             return False
-        with open(filename, "rb") as fh:
-            state = pickle.load(fh)
+        with open(filename, "rb") as file_handle:
+            state = pickle.load(file_handle)
         self._set_state(state, merge=merge)
         return True
 
-    def merge_from_disk(self, filename):
+    def merge_from_disk(self, filename) -> bool:
+        """
+        Merges stored file from disk with the current state of store
+        :param filename: name of file
+        :return: True if merge is successful, false otherwise
+        """
         return self.restore_from_disk(filename, merge=True)
 
     def client_quit(self):
+        """
+        Raises a client quit exception
+        """
         raise ClientQuit("client closed connection")
 
     def shutdown(self):
+        """
+        Raises a shutdown exception
+        """
         raise Shutdown("shutting down")
 
     # ===== Scheduled commands
-    def _decode_timestamp(self, timestamp) -> datetime:
+    def _decode_timestamp(self, timestamp: str) -> datetime:
+        """
+        Decodes a given timestamp
+        :param timestamp: timestamp to decode
+        :return: decoded timestamp
+        """
         timestamp_ = decode(timestamp)
         fmt = "%Y-%m-%d %H:%M:%S"
         if "." in timestamp_:
             fmt = fmt + ".%f"
         try:
             return datetime.datetime.strptime(timestamp_, fmt)
-        except ValueError:
-            raise CommandError(f"Timestamp {timestamp} must be formatted Y-m-d H:M:S")
+        except ValueError as error:
+            raise CommandError(f"Timestamp {timestamp} must be formatted Y-m-d H:M:S") from error
 
-    def schedule_add(self, timestamp, data):
-        dt = self._decode_timestamp(timestamp)
-        heapq.heappush(self._schedule, (dt, data))
-        return 1
+    def schedule_add(self, timestamp, data) -> int:
+        """
+        Adds a new schedule to recorded schedules
+        :param timestamp: timestamp to decode
+        :param data: data to add to schedule
+        :return:
+        """
+        try:
+            decoded_timestamp = self._decode_timestamp(timestamp)
+            heapq.heappush(self._schedule, (decoded_timestamp, data))
+            return 1
+        except Exception as error:
+            raise CommandError(f"timestamp {timestamp} does not exist {error}") from error
 
-    def schedule_read(self, timestamp=None):
-        dt = self._decode_timestamp(timestamp)
-        accum = []
-        while self._schedule and self._schedule[0][0] <= dt:
-            ts, data = heapq.heappop(self._schedule)
-            accum.append(data)
-        return accum
+    def schedule_read(self, timestamp=None) -> List:
+        """
+        Reads a given timestamp and returns the schedules that are less than the given timestamp. This removes the
+        schedules from the given schedule record.
+        :param timestamp: timestamp to remove
+        :return: list of popped schedules
+        """
+        try:
+            decoded_timestamp = self._decode_timestamp(timestamp)
+            accum = []
+            while self._schedule and self._schedule[0][0] <= decoded_timestamp:
+                _, data = heapq.heappop(self._schedule)
+                accum.append(data)
+            return accum
+        except Exception as error:
+            raise CommandError(f"Failed to read {timestamp}. Error: {error}") from error
 
     def schedule_flush(self) -> int:
         """
