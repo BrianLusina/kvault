@@ -8,6 +8,9 @@ lint: # runs linting
 test: # runs tests
 	pytest
 
+start: ## starts server
+	python kvault.py
+
 build: # builds and packages the application
 	poetry build
 

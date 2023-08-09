@@ -1,5 +1,9 @@
+"""
+Types
+"""
 from collections import namedtuple
 
+# pylint: disable-next=invalid-name
 unicode = str
 basestring = (bytes, str)
 

@@ -1,3 +1,4 @@
+#pylint: disable-next=too-many-lines
 """
 Contains all commands performed by the key store
 """
@@ -14,14 +15,21 @@ from ..types import Value, KV, HASH, QUEUE, SET
 from ..utils import enforce_datatype, decode
 
 
+# pylint: disable-next=too-many-public-methods
 class Commands(Guards):
     """
     Commands class contains all the commands performed by the key store
     """
 
-    # pylint: disable-next=missing-function-docstring
-    def __init__(self, kv: Optional[Dict[AnyStr, Value]], expiry_map: Dict, expiry: List, schedule: List):
-        self._kv: Dict[AnyStr, Value] = kv
+    def __init__(
+        self,
+        kv_store: Optional[Dict[AnyStr, Value]],
+        expiry_map: Dict,
+        expiry: List,
+        schedule: List,
+    ):
+        """Creates an instance of commands"""
+        self._kv: Dict[AnyStr, Value] = kv_store
         self._expiry_map = expiry_map
         self._expiry = expiry
         self._schedule = schedule
@@ -29,11 +37,7 @@ class Commands(Guards):
         super().__init__(self._kv, self._expiry_map)
 
     def expire(self, key, nseconds: Union[float, int]):
-        """
-        Sets an expiry time for a key in nano-seconds.
-        :param key: Key to expire
-        :param nseconds: seconds to add
-        """
+        """Sets an expiry time for a key in nano-seconds."""
         eta = time.time() + nseconds
         self._expiry_map[key] = eta
         heapq.heappush(self._expiry, (eta, key))
@@ -92,7 +96,9 @@ class Commands(Guards):
         try:
             return self._kv[key].value.popleft()
         except KeyError as key_error:
-            raise CommandError(f"Failed to find key with error {key_error}. Key {key} does not exist") from key_error
+            raise CommandError(
+                f"Failed to find key with error {key_error}. Key {key} does not exist"
+            ) from key_error
 
     @enforce_datatype(QUEUE)
     def rpop(self, key) -> Any:
@@ -105,7 +111,9 @@ class Commands(Guards):
         try:
             return self._kv[key].value.pop()
         except KeyError as error:
-            raise CommandError(f"Failed to find key with error {error}. Key {key} does not exist") from error
+            raise CommandError(
+                f"Failed to find key with error {error}. Key {key} does not exist"
+            ) from error
 
     @enforce_datatype(QUEUE)
     def lrem(self, key, value) -> int:
@@ -142,7 +150,9 @@ class Commands(Guards):
         try:
             return self._kv[key].value[idx]
         except KeyError as error:
-            raise CommandError(f"Failed to find key with error {error}. Key {key} does not exist") from error
+            raise CommandError(
+                f"Failed to find key with error {error}. Key {key} does not exist"
+            ) from error
 
     @enforce_datatype(QUEUE)
     def lset(self, key, idx, value):
@@ -175,7 +185,9 @@ class Commands(Guards):
             self._kv[key] = Value(QUEUE, deque(trimmed))
             return len(trimmed)
         except KeyError as error:
-            raise CommandError(f"Failed to find key with error {error}. Key {key} does not exist") from error
+            raise CommandError(
+                f"Failed to find key with error {error}. Key {key} does not exist"
+            ) from error
 
     @enforce_datatype(QUEUE)
     def rpoplpush(self, src, dest):
@@ -206,7 +218,9 @@ class Commands(Guards):
         try:
             return list(self._kv[key].value)[start:end]
         except KeyError as error:
-            raise CommandError(f"Failed to find key with error {error}. Key {key} does not exist") from error
+            raise CommandError(
+                f"Failed to find key with error {error}. Key {key} does not exist"
+            ) from error
 
     @enforce_datatype(QUEUE)
     def lflush(self, key):
@@ -221,7 +235,9 @@ class Commands(Guards):
             self._kv[key].value.clear()
             return qlen
         except KeyError as error:
-            raise CommandError(f"Failed to find key with error {error}. Key {key} does not exist") from error
+            raise CommandError(
+                f"Failed to find key with error {error}. Key {key} does not exist"
+            ) from error
 
     ## Hash commands
     @enforce_datatype(HASH)
@@ -413,7 +429,6 @@ class Commands(Guards):
         Increments the key's value by n. If the key does not exist a new key value is created and they key is returned
         :param key: Key
         :param delta: Delta to increase the value by
-        :return: Either an updated value or a new value
         """
         if key in self._kv:
             value = self._kv[key].value + delta
@@ -427,7 +442,6 @@ class Commands(Guards):
         Appends a new key value pair
         :param key: Key to add
         :param value: value to add
-        :return: newly added value
         """
         if key not in self._kv:
             self.kv_set(key=key, value=value)
@@ -451,7 +465,6 @@ class Commands(Guards):
         Sets a new key value pair and returns 1 if successful
         :param key: Key to add.
         :param value: Value to add
-        :return:
         """
         if isinstance(value, dict):
             data_type = HASH
@@ -480,7 +493,6 @@ class Commands(Guards):
         Decrements a key's value by a set amount n
         :param key: key to decrement
         :param delta: Value to decrement key by
-        :return:
         """
         return self._kv_incr(key=key, delta=-1 * delta)
 
@@ -488,7 +500,6 @@ class Commands(Guards):
         """
         Deletes a key. returns 1 if successful, 0 if key can not be found
         :param key: Key to delete
-        :return:
         """
         if key in self._kv:
             del self._kv[key]
@@ -655,7 +666,6 @@ class Commands(Guards):
         :param key: Key to set
         :param value: Value of the key
         :param expires: Expiry time of the key
-        :return:
         """
         self.kv_set(key, value)
         self.expire(key, expires)
@@ -874,7 +884,6 @@ class Commands(Guards):
         except KeyError as error:
             raise CommandError(f"Key {key} does not exist {error}") from error
 
-    # ===== Misc Commands
     def _get_state(self) -> Dict[str, Any]:
         """
         Returns the current state of the store
@@ -901,11 +910,7 @@ class Commands(Guards):
             self._schedule = state["schedule"]
 
     def save_to_disk(self, filename) -> bool:
-        """
-        Saves the current state to disk given a filename.
-        :param filename: File name to use to save to disk
-        :return: True if operation is successful
-        """
+        """Saves the current state to disk given a filename."""
         with open(filename, "wb") as file_handle:
             pickle.dump(self._get_state(), file_handle, pickle.HIGHEST_PROTOCOL)
         return True
@@ -916,7 +921,6 @@ class Commands(Guards):
         state if the merge argument is set to True
         :param filename: filename to use
         :param merge: whether to merge to the new state
-        :return: True if it's possible to merge the state, False otherwise
         """
         if not os.path.exists(filename):
             return False
@@ -926,32 +930,19 @@ class Commands(Guards):
         return True
 
     def merge_from_disk(self, filename) -> bool:
-        """
-        Merges stored file from disk with the current state of store
-        :param filename: name of file
-        :return: True if merge is successful, false otherwise
-        """
+        """Merges stored file from disk with the current state of store"""
         return self.restore_from_disk(filename, merge=True)
 
     def client_quit(self):
-        """
-        Raises a client quit exception
-        """
+        """Raises a client quit exception"""
         raise ClientQuit("client closed connection")
 
     def shutdown(self):
-        """
-        Raises a shutdown exception
-        """
+        """Raises a shutdown exception"""
         raise Shutdown("shutting down")
 
-    # ===== Scheduled commands
     def _decode_timestamp(self, timestamp: str) -> datetime:
-        """
-        Decodes a given timestamp
-        :param timestamp: timestamp to decode
-        :return: decoded timestamp
-        """
+        """Decodes a given timestamp"""
         timestamp_ = decode(timestamp)
         fmt = "%Y-%m-%d %H:%M:%S"
         if "." in timestamp_:
@@ -959,28 +950,29 @@ class Commands(Guards):
         try:
             return datetime.datetime.strptime(timestamp_, fmt)
         except ValueError as error:
-            raise CommandError(f"Timestamp {timestamp} must be formatted Y-m-d H:M:S") from error
+            raise CommandError(
+                f"Timestamp {timestamp} must be formatted Y-m-d H:M:S"
+            ) from error
 
     def schedule_add(self, timestamp, data) -> int:
         """
         Adds a new schedule to recorded schedules
         :param timestamp: timestamp to decode
         :param data: data to add to schedule
-        :return:
         """
         try:
             decoded_timestamp = self._decode_timestamp(timestamp)
             heapq.heappush(self._schedule, (decoded_timestamp, data))
             return 1
         except Exception as error:
-            raise CommandError(f"timestamp {timestamp} does not exist {error}") from error
+            raise CommandError(
+                f"timestamp {timestamp} does not exist {error}"
+            ) from error
 
     def schedule_read(self, timestamp=None) -> List:
         """
         Reads a given timestamp and returns the schedules that are less than the given timestamp. This removes the
         schedules from the given schedule record.
-        :param timestamp: timestamp to remove
-        :return: list of popped schedules
         """
         try:
             decoded_timestamp = self._decode_timestamp(timestamp)
@@ -995,7 +987,6 @@ class Commands(Guards):
     def schedule_flush(self) -> int:
         """
         Flushes the schedule and returns the previous length.
-        :return: length of original schedule
         """
         schedule_len = self.schedule_length()
         self._schedule = []
@@ -1004,6 +995,5 @@ class Commands(Guards):
     def schedule_length(self) -> int:
         """
         Returns the length of the schedule
-        :return: length
         """
         return len(self._schedule)

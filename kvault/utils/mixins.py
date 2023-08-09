@@ -8,6 +8,7 @@ from ..exceptions import CommandError
 from ..types import Value, QUEUE, HASH, SET, KV
 
 
+# pylint: disable-next=too-few-public-methods
 class MetaUtils:
     """
     Class with helper properties and utilities
@@ -24,19 +25,19 @@ class Guards:
     Contains validity checks for the data types and expiry time of commands
     """
 
-    def __init__(self, kv: Dict, expiry_map: Dict[Any, float]):
-        self._kv = kv
+    def __init__(self, kv_store: Dict, expiry_map: Dict[Any, float]):
+        self._kv = kv_store
         self._expiry_map = expiry_map
 
-    def check_expired(self, key, ts=None) -> bool:
+    def check_expired(self, key, timestamp=None) -> bool:
         """
         Checks if a key has expired
         :param key: Key
-        :param ts: Timestamp, defaulted to None and will use current time
+        :param timestamp: Timestamp, defaulted to None and will use current time
         :return: boolean
         """
-        ts = ts or time.time()
-        return key in self._expiry_map and ts > self._expiry_map[key]
+        _timestamp = timestamp or time.time()
+        return key in self._expiry_map and _timestamp > self._expiry_map[key]
 
     def check_datatype(self, data_type, key, set_missing=True, subtype=None):
         """
@@ -55,9 +56,12 @@ class Guards:
             value = self._kv[key]
             if value.data_type != data_type:
                 raise CommandError(
-                    f"Operation against wrong key type. Key type {value.data_type}. data type: {data_type}")
+                    f"Operation against wrong key type. Key type {value.data_type}. data type: {data_type}"
+                )
             if subtype is not None and not isinstance(value.value, subtype):
-                raise CommandError(f"Operation against wrong value type. Value: {value.value}. Subtype: {subtype}")
+                raise CommandError(
+                    f"Operation against wrong value type. Value: {value.value}. Subtype: {subtype}"
+                )
         elif set_missing:
             value = None
             if data_type == HASH:

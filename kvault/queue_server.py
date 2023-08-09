@@ -13,7 +13,6 @@ from kvault.infra.logger import logger
 from .exceptions import ClientQuit, Shutdown, CommandError, Error
 from .protocol_handler import ProtocolHandler
 from .types import basestring, Value, unicode
-from .utils import decode
 from .utils.mixins import MetaUtils
 from .commands import Commands
 
@@ -27,6 +26,7 @@ class Counter:
     :cvar command_errors is the count of errors encountered by the server
     :cvar connections is the number of connections to the server
     """
+
     active_connections: int = 0
     commands_processed: int = 0
     command_errors: int = 0
@@ -41,6 +41,7 @@ class ServerInfo:
     :cvar port is the port the server will run on
     :cvar max_clients is the maximum number of clients that the server will accept connections from
     """
+
     host: str = "127.0.0.1"
     port: int = 31337
     max_clients: int = 1024
@@ -50,13 +51,14 @@ class ServerInfo:
 class ServerState:
     """
     Contains the server state
-    :cvar kv is the in memory Key Value store
+    :cvar kv_store is the in memory Key Value store
     :cvar schedule contains a list of tuples of scheduled commands
     :cvar expiry
     :cvar expiry_map a key value pair where the key is the expiry time and the value is the value. This contains the
     expired data
     """
-    kv: Dict[AnyStr, Value] = field(default_factory=dict)
+
+    kv_store: Dict[AnyStr, Value] = field(default_factory=dict)
     schedule: List[Tuple[Any, Any]] = field(default_factory=list)
     expiry: List[Tuple[float, Any]] = field(default_factory=list)
     expiry_map: Dict[Any, float] = field(default_factory=dict)
@@ -71,11 +73,7 @@ class QueueServer(Commands, MetaUtils):
     def __init__(
             self, host: str = "127.0.0.1", port: int = 31337, max_clients: int = 1024
     ):
-        self._server_info = ServerInfo(
-            host=host,
-            port=port,
-            max_clients=max_clients
-        )
+        self._server_info = ServerInfo(host=host, port=port, max_clients=max_clients)
 
         self._pool = Pool(max_clients)
         self._server = StreamServer(
@@ -87,27 +85,26 @@ class QueueServer(Commands, MetaUtils):
         self._protocol = ProtocolHandler()
 
         self._server_state = ServerState(
-            kv={},
-            schedule=[],
-            expiry=[],
-            expiry_map={}
+            kv_store={}, schedule=[], expiry=[], expiry_map={}
         )
 
         self._counter = Counter(
-            active_connections=0,
-            commands_processed=0,
-            command_errors=0,
-            connections=0
+            active_connections=0, commands_processed=0, command_errors=0, connections=0
         )
 
         super().__init__(
-            kv=self._server_state.kv,
+            kv_store=self._server_state.kv_store,
             expiry_map=self._server_state.expiry_map,
             expiry=self._server_state.expiry,
             schedule=self._server_state.schedule,
         )
 
     def connection_handler(self, conn, address):
+        """
+        Handles a connection given a connection file like object and address
+        :param conn: File like socket object
+        :param address: address to handle connection on
+        """
         logger.info(f"[{self.name}] Connection received: {address}")
         socket_file = conn.makefile("rwb")
         self._counter.active_connections += 1
@@ -121,24 +118,30 @@ class QueueServer(Commands, MetaUtils):
             except ClientQuit:
                 logger.info(f"Client exited: {address}")
                 break
+            # pylint: disable-next=broad-exception-caught
             except Exception as exc:
                 logger.exception(f"Error processing command: {exc}", exc)
         self._counter.active_connections -= 1
 
     def request_response(self, socket_file: BufferedRWPair):
+        """
+        Handles the request from a socket file and responds on the protocol handler
+        :param socket_file: File like object
+        """
         data = self._protocol.handle_request(socket_file)
         try:
             resp = self.respond(data)
-        except Shutdown:
+        except Shutdown as exc:
             logger.info(f"[{self.name}] Shutting down...")
             self._protocol.write_response(socket_file=socket_file, data=1)
-            raise KeyboardInterrupt
+            raise KeyboardInterrupt from exc
         except ClientQuit:
             self._protocol.write_response(socket_file=socket_file, data=1)
             raise
         except CommandError as cmd_error:
             resp = Error(cmd_error.message)
             self._counter.command_errors += 1
+        # pylint: disable-next=broad-exception-caught
         except Exception as err:
             logger.error(f"[{self.name}] Unhanded Exception {err}")
             resp = Error(f"Unhandled server error: ${err}")
@@ -147,28 +150,30 @@ class QueueServer(Commands, MetaUtils):
         self._protocol.write_response(socket_file=socket_file, data=resp)
 
     def respond(self, data):
+        """
+        Responds to a given command with the given data. The data is split into 2 parts, the first part is the command
+        the second is the data.
+        :param data: data to respond to
+        :return: response from callback
+        """
+        split_data = []
         if isinstance(data, str):
             try:
-                data = data.split()
-            except:
-                raise CommandError(f"Unrecognized request type {data}")
-        if not isinstance(data[0], basestring):
+                split_data = data.split()
+            # pylint: disable-next=broad-exception-caught
+            except Exception as exc:
+                raise CommandError(f"Unrecognized request type {data}") from exc
+        if not isinstance(split_data[0], basestring):
             raise CommandError(
-                f"First parameter must be command name. Received {data[0]}"
+                f"First parameter must be command name. Received {split_data[0]}"
             )
 
-        command = data[0].upper()
+        command = split_data[0].upper()
         if command not in self._commands:
             logger.error(f"{self.name} Unrecognized command: {command}")
             raise CommandError(f"Unrecognized command: {command}")
-        else:
-            logger.debug(f"Received command: {decode(command)}")
 
-        return self._commands[command](*data[1:])
-
-    def check_expired(self, key, ts=None) -> bool:
-        ts = ts or time.time()
-        return key in self._server_state.expiry_map and ts > self._server_state.expiry_map[key]
+        return self._commands[command](*split_data[1:])
 
     def get_commands(self) -> Dict[Union[bytes, str], Callable]:
         """
@@ -255,6 +260,10 @@ class QueueServer(Commands, MetaUtils):
         )
 
     def info(self) -> Dict:
+        """
+        Retrieves the current information of the server
+        :return: dictionary mapping of the server information
+        """
         return {
             "active_connections": self._counter.active_connections,
             "commands_processed": self._counter.commands_processed,
@@ -265,14 +274,26 @@ class QueueServer(Commands, MetaUtils):
         }
 
     def flush_all(self):
+        """
+        Clears the store and scheduled commands
+        :return: 1 once flushing is successful
+        """
         self.kv_flush()
         self.schedule_flush()
         return 1
 
     def run(self):
+        """
+        Runs and starts the server
+        """
         self._server.serve_forever()
 
     def add_command(self, command, callback):
+        """
+        Adds a command to the list of commands supported by the server
+        :param command: command name
+        :param callback: callback to handle command
+        """
         if isinstance(command, unicode):
             command = command.encode("utf-8")
         self._commands[command] = callback
