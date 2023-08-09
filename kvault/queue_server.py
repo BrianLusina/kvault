@@ -144,7 +144,7 @@ class QueueServer(Commands, MetaUtils):
         # pylint: disable-next=broad-exception-caught
         except Exception as err:
             logger.error(f"[{self.name}] Unhanded Exception {err}")
-            resp = Error(f"Unhandled server error: ${err}")
+            resp = Error(f"Unhandled server error: {err}")
         else:
             self._counter.commands_processed += 1
         self._protocol.write_response(socket_file=socket_file, data=resp)
@@ -156,24 +156,23 @@ class QueueServer(Commands, MetaUtils):
         :param data: data to respond to
         :return: response from callback
         """
-        split_data = []
         if isinstance(data, str):
             try:
-                split_data = data.split()
+                data = data.split()
             # pylint: disable-next=broad-exception-caught
             except Exception as exc:
                 raise CommandError(f"Unrecognized request type {data}") from exc
-        if not isinstance(split_data[0], basestring):
+        if not isinstance(data[0], basestring):
             raise CommandError(
-                f"First parameter must be command name. Received {split_data[0]}"
+                f"First parameter must be command name. Received {data[0]}"
             )
 
-        command = split_data[0].upper()
+        command = data[0].upper()
         if command not in self._commands:
             logger.error(f"{self.name} Unrecognized command: {command}")
             raise CommandError(f"Unrecognized command: {command}")
 
-        return self._commands[command](*split_data[1:])
+        return self._commands[command](*data[1:])
 
     def get_commands(self) -> Dict[Union[bytes, str], Callable]:
         """
