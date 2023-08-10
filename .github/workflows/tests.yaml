@@ -9,8 +9,11 @@ on:
 
 jobs:
   unittests:
+    strategy:
+      matrix:
+        python-version: [ '3.10' ]
     name: Lint
     uses: BrianLusina/ci-workflows/.github/workflows/python-poetry-test.yml@main
     with:
       command: make test
-      version: '3.10'
+      python-version: ${{ matrix.python-version }}
