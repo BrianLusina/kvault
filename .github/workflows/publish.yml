@@ -1,0 +1,25 @@
+name: Build
+
+on:
+  workflow_run:
+    workflows:
+      - "Build"
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  lint:
+    strategy:
+      matrix:
+        python-version: [ '3.10' ]
+    name: Lint
+    uses: BrianLusina/ci-workflows/.github/workflows/python-poetry-pypi-publish.yml@main
+    with:
+      command: make publish
+      version: ${{ matrix.python-version }}
+    secrets:
+      pypi_token: ${{ secrets.PYPI_TOKEN }}
