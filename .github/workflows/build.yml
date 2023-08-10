@@ -13,11 +13,8 @@ permissions:
 
 jobs:
   lint:
-    strategy:
-      matrix:
-        python-version: [ '3.10' ]
     name: Lint
     uses: BrianLusina/ci-workflows/.github/workflows/python-poetry-build.yml@main
     with:
       command: make build
-      version: ${{ matrix.python-version }}
+      version: '3.10'
