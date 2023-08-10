@@ -72,7 +72,7 @@ Options:
 Note that the above output can be obtained from the below command:
 
 ```shell
-python kvault.py -h
+python cli.py -h
 ```
 
 To run with debug logging on port 31339, for example:
