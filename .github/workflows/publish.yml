@@ -14,7 +14,7 @@ permissions:
 jobs:
   lint:
     name: Lint
-    uses: BrianLusina/ci-workflows/.github/workflows/python-poetry-pypi-publish.yml@main
+    uses: SanctumLabs/ci-workflows/.github/workflows/python-poetry-pypi-publish.yml@main
     with:
       command: make publish
     secrets:
