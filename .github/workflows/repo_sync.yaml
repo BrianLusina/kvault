@@ -8,7 +8,6 @@ on:
 
 jobs:
   bitbucket-sync:
-    runs-on: ubuntu-latest
     name: Bitbucket Repo Sync
     uses: SanctumLabs/ci-workflows/.github/workflows/repo_sync.yml@main
     secrets:
@@ -17,7 +16,6 @@ jobs:
       token: ${{ secrets.BITBUCKET_ACCESS_TOKEN }}
 
   gitlab-sync:
-    runs-on: ubuntu-latest
     name: GitLab Repo Sync
     uses: SanctumLabs/ci-workflows/.github/workflows/repo_sync.yml@main
     secrets:
