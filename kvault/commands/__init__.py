@@ -1,4 +1,4 @@
-#pylint: disable-next=too-many-lines
+# pylint: disable-next=too-many-lines
 """
 Contains all commands performed by the key store
 """

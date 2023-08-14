@@ -87,7 +87,7 @@ if __name__ == "__main__":
     load_extensions(queue_server, args.extensions or ())
     print("\x1b[32m  .--.")
     print(
-    # pylint: disable-next=consider-using-f-string
+        # pylint: disable-next=consider-using-f-string
         " /( \x1b[34m@\x1b[33m >\x1b[32m    ,-.  "
         "\x1b[1;32mKVault "
         "\x1b[1;33m%s:%s\x1b[32m" % (args.host, args.port)

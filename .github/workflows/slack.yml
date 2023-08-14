@@ -1,6 +1,5 @@
 # Workflow only runs after the specified workflows have concluded running to completion. It then checks if they have
 # been successful or failed. Appropriate messages are then sent afterwards on each event type
-# Ref https://github.com/rtCamp/action-slack-notify
 name: Slack Notification
 
 on:
@@ -9,8 +8,10 @@ on:
       - "Lint"
       - "Tests"
       - "Build"
+      - "Publish"
       - "Docker"
       - "Release"
+      - "RepoSync"
     types:
       - completed
 

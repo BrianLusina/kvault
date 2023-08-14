@@ -1,4 +1,4 @@
-name: Build
+name: Publish
 
 on:
   workflow_run:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   lint:
-    name: Lint
+    name: Publish
     uses: SanctumLabs/ci-workflows/.github/workflows/python-poetry-pypi-publish.yml@main
     with:
       command: make publish

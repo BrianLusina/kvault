@@ -1,0 +1,26 @@
+# Ref: https://github.com/wangchucheng/git-repo-sync
+name: RepoSync
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  bitbucket-sync:
+    runs-on: ubuntu-latest
+    name: Bitbucket Repo Sync
+    uses: SanctumLabs/ci-workflows/.github/workflows/repo_sync.yml@main
+    secrets:
+      url: ${{ secrets.BITBUCKET_REPO_URL}}
+      username: ${{ secrets.BITBUCKET_USERNAME }}
+      token: ${{ secrets.BITBUCKET_ACCESS_TOKEN }}
+
+  gitlab-sync:
+    runs-on: ubuntu-latest
+    name: GitLab Repo Sync
+    uses: SanctumLabs/ci-workflows/.github/workflows/repo_sync.yml@main
+    secrets:
+      url: ${{ secrets.GITLAB_REPO_URL }}
+      username: ${{ secrets.GITLAB_USERNAME }}
+      token: ${{ secrets.GITLAB_ACCESS_TOKEN }}

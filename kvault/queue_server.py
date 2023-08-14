@@ -71,7 +71,7 @@ class QueueServer(Commands, MetaUtils):
 
     # pylint: disable-next=missing-function-docstring
     def __init__(
-            self, host: str = "127.0.0.1", port: int = 31337, max_clients: int = 1024
+        self, host: str = "127.0.0.1", port: int = 31337, max_clients: int = 1024
     ):
         self._server_info = ServerInfo(host=host, port=port, max_clients=max_clients)
 
