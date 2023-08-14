@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ '3.10' ]
-    name: Lint
+    name: Build
     uses: SanctumLabs/ci-workflows/.github/workflows/python-poetry-build.yml@main
     with:
       command: make build
