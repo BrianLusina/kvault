@@ -1,3 +1,6 @@
+"""
+Entry point to starting the server
+"""
 import optparse
 import importlib
 from kvault.queue_server import QueueServer

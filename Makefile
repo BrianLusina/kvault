@@ -26,6 +26,5 @@ pre-commit-install: # installs pre commit hooks
 pre-commit: # runs pre commit hooks
 	pre-commit run --all-files
 
-publish: # publishes library to PyPI
-	poetry build
+publish: build # publishes library to PyPI
 	twine upload --verbose -u '__token__' dist/*

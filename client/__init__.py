@@ -6,7 +6,7 @@ from kvault.exceptions import ServerDisconnect, ServerInternalError, CommandErro
 logger = logging.getLogger(__name__)
 
 
-class Client(object):
+class Client:
 
     def __init__(self, host='127.0.0.1', port=31337, pool_max_age=60):
         self._host = host
@@ -15,6 +15,11 @@ class Client(object):
         self._protocol = ProtocolHandler()
 
     def execute(self, *args):
+        """
+        Executes a give command
+        :param args: Arguments for command
+        :return: response from executed command
+        """
         conn = self._socket_pool.checkout()
         close_conn = args[0] in (b'QUIT', b'SHUTDOWN')
         self._protocol.write_response(conn, args)
@@ -37,10 +42,19 @@ class Client(object):
         return resp
 
     def close(self):
+        """
+        Closes client connection
+        """
         self.execute(b'QUIT')
 
     @staticmethod
     def command(cmd):
+        """
+        Parses a command executes the given command.
+        :param cmd: Command name
+        :return: handler method
+        """
+
         def method(self, *args):
             return self.execute(cmd.encode('utf-8'), *args)
 
