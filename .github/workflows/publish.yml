@@ -1,15 +1,9 @@
 name: Publish
 
 on:
-  workflow_run:
-    workflows:
-      - "Build"
-    types:
-      - completed
-
-permissions:
-  contents: read
-  pull-requests: read
+  push:
+    tags:
+      - "*"
 
 jobs:
   lint:
@@ -17,5 +11,6 @@ jobs:
     uses: SanctumLabs/ci-workflows/.github/workflows/python-pypi-publish.yml@main
     with:
       command: make publish
+      version: ${{ github.ref_name }}
     secrets:
       pypi_token: ${{ secrets.PYPI_TOKEN }}
