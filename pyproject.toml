@@ -1,6 +1,7 @@
 [tool.poetry]
 name = "kvault"
-version = "0.1.0"
+# This version field is not being used. The version field is dynamicall updated as below
+version = "0.0.0"
 description = "Simple Miniature key-value datastore"
 authors = ["BrianLusina <12752833+BrianLusina@users.noreply.github.com>"]
 license = "MIT"
@@ -26,6 +27,13 @@ python-dotenv = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest-cov = "^4.1.0"
+
+[tool.setuptools.dynamic]
+version = { attr = "kvault.__version__" }
+
+# Reference: https://github.com/tiangolo/poetry-version-plugin
+[tool.poetry-version-plugin]
+source = "git-tag"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
