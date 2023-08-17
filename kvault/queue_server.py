@@ -3,7 +3,7 @@ KVault server that is used by the clients to send commands. The QueueServer has 
 handler that clients use to parse and send commands. The queue server uses the protocol handler to serialize &
 deserialize the messages
 """
-from typing import Dict, Callable, AnyStr, Union, Any, List, Tuple
+from typing import Dict, Callable, Union, Any, List, Tuple
 from dataclasses import dataclass, field
 import time
 from io import BufferedRWPair
@@ -58,7 +58,7 @@ class ServerState:
     expired data
     """
 
-    kv_store: Dict[AnyStr, Value] = field(default_factory=dict)
+    kv_store: Dict[Any, Value] = field(default_factory=dict)
     schedule: List[Tuple[Any, Any]] = field(default_factory=list)
     expiry: List[Tuple[float, Any]] = field(default_factory=list)
     expiry_map: Dict[Any, float] = field(default_factory=dict)
@@ -71,7 +71,7 @@ class QueueServer(Commands, MetaUtils):
 
     # pylint: disable-next=missing-function-docstring
     def __init__(
-        self, host: str = "127.0.0.1", port: int = 31337, max_clients: int = 1024
+            self, host: str = "127.0.0.1", port: int = 31337, max_clients: int = 1024
     ):
         self._server_info = ServerInfo(host=host, port=port, max_clients=max_clients)
 

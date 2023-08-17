@@ -2,8 +2,19 @@
 install:
 	pipenv install
 
-lint: # runs linting
+lint-pylint: ## runs linting
 	pylint kvault
+
+lint-mypy: ## runs type checking
+	poetry run mypy .
+
+lint-flake8: ## Runs formatting with flake8
+	poetry run flake8 kvault
+
+lint-black: ## Runs formatting with black
+	black kvault
+
+lint: lint-black lint-flake8 lint-mypy
 
 test: # runs tests
 	pytest
@@ -12,13 +23,11 @@ start: ## starts server
 	python kvault.py
 
 build: # builds and packages the application
+	poetry self add "poetry-dynamic-versioning[plugin]"
 	poetry build
 
 test-cover: # Runs tests with coverage
 	pytest --cov=kvault tests/
-
-format: # Runs formatting with black
-	black kvault
 
 pre-commit-install: # installs pre commit hooks
 	pre-commit install

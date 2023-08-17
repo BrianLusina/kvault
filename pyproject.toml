@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "kvault"
-# This version field is not being used. The version field is dynamicall updated as below
+# This version field is not being used. The version field is dynamically updated as below
 version = "0.0.0"
 description = "Simple Miniature key-value datastore"
 authors = ["BrianLusina <12752833+BrianLusina@users.noreply.github.com>"]
@@ -18,23 +18,34 @@ python = "^3.10"
 gevent = "^23.7.0"
 loguru = "^0.7.0"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 pylint = "^2.17.5"
 pytest = "^7.4.0"
 black = "^23.7.0"
 pre-commit = "^3.3.3"
 python-dotenv = "^1.0.0"
-
-[tool.poetry.group.dev.dependencies]
 pytest-cov = "^4.1.0"
+mypy = "^1.5.1"
+flake8 = "^6.1.0"
 
 [tool.setuptools.dynamic]
 version = { attr = "kvault.__version__" }
 
-# Reference: https://github.com/tiangolo/poetry-version-plugin
-[tool.poetry-version-plugin]
-source = "git-tag"
+# Reference: https://mypy.readthedocs.io/en/stable/index.html
+[tool.mypy]
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = "gevent.*"
+ignore_missing_imports = true
+
+# reference: https://github.com/mtkennerly/poetry-dynamic-versioning
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "semver"
+latest-tag = true
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
+build-backend = "poetry_dynamic_versioning.backend"

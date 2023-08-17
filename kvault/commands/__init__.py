@@ -3,7 +3,7 @@
 Contains all commands performed by the key store
 """
 from collections import deque
-from typing import Dict, Optional, AnyStr, List, Any, Union
+from typing import Dict, Optional, List, Any, Union
 import heapq
 import time
 import os
@@ -23,13 +23,13 @@ class Commands(Guards):
 
     def __init__(
         self,
-        kv_store: Optional[Dict[AnyStr, Value]],
+        kv_store: Dict[Any, Value],
         expiry_map: Dict,
         expiry: List,
         schedule: List,
     ):
         """Creates an instance of commands"""
-        self._kv: Dict[AnyStr, Value] = kv_store
+        self._kv: Dict[Any, Value] = kv_store
         self._expiry_map = expiry_map
         self._expiry = expiry
         self._schedule = schedule
@@ -488,7 +488,7 @@ class Commands(Guards):
         return self._kv_incr(key=key, delta=-1)
 
     @enforce_datatype(KV, set_missing=False, subtype=(float, int))
-    def kv_decrby(self, key, delta: Union[float, int]):
+    def kv_decrby(self, key, delta: int):
         """
         Decrements a key's value by a set amount n
         :param key: key to decrement
@@ -941,7 +941,7 @@ class Commands(Guards):
         """Raises a shutdown exception"""
         raise Shutdown("shutting down")
 
-    def _decode_timestamp(self, timestamp: str) -> datetime:
+    def _decode_timestamp(self, timestamp: str):
         """Decodes a given timestamp"""
         timestamp_ = decode(timestamp)
         fmt = "%Y-%m-%d %H:%M:%S"

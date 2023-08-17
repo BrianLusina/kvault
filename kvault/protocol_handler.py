@@ -176,7 +176,7 @@ class ProtocolHandler(MetaUtils):
             return float(number)
         return int(number)
 
-    def handle_string(self, socket_file) -> Optional[bytes]:
+    def handle_string(self, socket_file) -> Optional[Union[str, bytes, bytearray]]:
         """
         Handles string serialization/deserialization sent over the wire.
         Format of the data looks like this ${number of bytes}\r\n{data}\r\n
@@ -203,16 +203,22 @@ class ProtocolHandler(MetaUtils):
         """
         string_ = self.handle_string(socket_file=socket_file)
         if string_:
-            return string_.decode("utf-8")
+            if isinstance(string_, bytes | bytearray):
+                return string_.decode("utf-8")
+            if isinstance(string_, str):
+                return string_
         return None
 
-    def handle_json(self, socket_file) -> Any:
+    def handle_json(self, socket_file) -> Optional[Any]:
         """
         Handles JSON string (uses bulk string rules). This uses the handler handle_string
         :param socket_file: File like object to read data
         :return: Python object
         """
-        return json.loads(self.handle_string(socket_file=socket_file))
+        deserialized_str = self.handle_string(socket_file=socket_file)
+        if deserialized_str:
+            return json.loads(deserialized_str)
+        return None
 
     def handle_array(self, socket_file) -> List[Any]:
         """
