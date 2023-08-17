@@ -3,7 +3,7 @@ install:
 	pipenv install
 
 lint-pylint: ## runs linting
-	pylint kvault
+	poetry run pylint kvault
 
 lint-mypy: ## runs type checking
 	poetry run mypy .
@@ -27,7 +27,7 @@ build: # builds and packages the application
 	poetry build
 
 test-cover: # Runs tests with coverage
-	pytest --cov=kvault tests/
+	poetry run pytest --cov=kvault tests/
 
 pre-commit-install: # installs pre commit hooks
 	pre-commit install
