@@ -1,3 +1,6 @@
+"""
+Kvault client that communicates via protocol handler to the server
+"""
 import logging
 from kvault.protocol_handler import ProtocolHandler
 from kvault.socket_pool import SocketPool
@@ -7,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 
 class Client:
+    """
+    KCault Client
+    """
 
     def __init__(self, host='127.0.0.1', port=31337, pool_max_age=60):
         self._host = host
@@ -25,12 +31,12 @@ class Client:
         self._protocol.write_response(conn, args)
         try:
             resp = self._protocol.handle_request(conn)
-        except EOFError:
+        except EOFError as exc:
             self._socket_pool.close()
-            raise ServerDisconnect('server went away')
-        except Exception:
+            raise ServerDisconnect('server went away') from exc
+        except Exception as exc:
             self._socket_pool.close()
-            raise ServerInternalError('internal server error')
+            raise ServerInternalError('internal server error') from exc
         else:
             if close_conn:
                 self._socket_pool.close()
@@ -60,79 +66,79 @@ class Client:
 
         return method
 
-    lpush = command('LPUSH')
-    rpush = command('RPUSH')
-    lpop = command('LPOP')
-    rpop = command('RPOP')
-    lrem = command('LREM')
-    llen = command('LLEN')
-    lindex = command('LINDEX')
-    lrange = command('LRANGE')
-    lset = command('LSET')
-    ltrim = command('LTRIM')
-    rpoplpush = command('RPOPLPUSH')
-    lflush = command('LFLUSH')
+    lpush = command(cmd='LPUSH')
+    rpush = command(cmd='RPUSH')
+    lpop = command(cmd='LPOP')
+    rpop = command(cmd='RPOP')
+    lrem = command(cmd='LREM')
+    llen = command(cmd='LLEN')
+    lindex = command(cmd='LINDEX')
+    lrange = command(cmd='LRANGE')
+    lset = command(cmd='LSET')
+    ltrim = command(cmd='LTRIM')
+    rpoplpush = command(cmd='RPOPLPUSH')
+    lflush = command(cmd='LFLUSH')
 
-    append = command('APPEND')
-    decr = command('DECR')
-    decrby = command('DECRBY')
-    delete = command('DELETE')
-    exists = command('EXISTS')
-    get = command('GET')
-    getset = command('GETSET')
-    incr = command('INCR')
-    incrby = command('INCRBY')
-    mdelete = command('MDELETE')
-    mget = command('MGET')
-    mpop = command('MPOP')
-    mset = command('MSET')
-    msetex = command('MSETEX')
-    pop = command('POP')
-    set = command('SET')
-    setex = command('SETEX')
-    setnx = command('SETNX')
-    length = command('LEN')
-    flush = command('FLUSH')
+    append = command(cmd='APPEND')
+    decr = command(cmd='DECR')
+    decrby = command(cmd='DECRBY')
+    delete = command(cmd='DELETE')
+    exists = command(cmd='EXISTS')
+    get = command(cmd='GET')
+    getset = command(cmd='GETSET')
+    incr = command(cmd='INCR')
+    incrby = command(cmd='INCRBY')
+    mdelete = command(cmd='MDELETE')
+    mget = command(cmd='MGET')
+    mpop = command(cmd='MPOP')
+    mset = command(cmd='MSET')
+    msetex = command(cmd='MSETEX')
+    pop = command(cmd='POP')
+    set = command(cmd='SET')
+    setex = command(cmd='SETEX')
+    setnx = command(cmd='SETNX')
+    length = command(cmd='LEN')
+    flush = command(cmd='FLUSH')
 
-    hdel = command('HDEL')
-    hexists = command('HEXISTS')
-    hget = command('HGET')
-    hgetall = command('HGETALL')
-    hincrby = command('HINCRBY')
-    hkeys = command('HKEYS')
-    hlen = command('HLEN')
-    hmget = command('HMGET')
-    hmset = command('HMSET')
-    hset = command('HSET')
-    hsetnx = command('HSETNX')
-    hvals = command('HVALS')
+    hdel = command(cmd='HDEL')
+    hexists = command(cmd='HEXISTS')
+    hget = command(cmd='HGET')
+    hgetall = command(cmd='HGETALL')
+    hincrby = command(cmd='HINCRBY')
+    hkeys = command(cmd='HKEYS')
+    hlen = command(cmd='HLEN')
+    hmget = command(cmd='HMGET')
+    hmset = command(cmd='HMSET')
+    hset = command(cmd='HSET')
+    hsetnx = command(cmd='HSETNX')
+    hvals = command(cmd='HVALS')
 
-    sadd = command('SADD')
-    scard = command('SCARD')
-    sdiff = command('SDIFF')
-    sdiffstore = command('SDIFFSTORE')
-    sinter = command('SINTER')
-    sinterstore = command('SINTERSTORE')
-    sismember = command('SISMEMBER')
-    smembers = command('SMEMBERS')
-    spop = command('SPOP')
-    srem = command('SREM')
-    sunion = command('SUNION')
-    sunionstore = command('SUNIONSTORE')
+    sadd = command(cmd='SADD')
+    scard = command(cmd='SCARD')
+    sdiff = command(cmd='SDIFF')
+    sdiffstore = command(cmd='SDIFFSTORE')
+    sinter = command(cmd='SINTER')
+    sinterstore = command(cmd='SINTERSTORE')
+    sismember = command(cmd='SISMEMBER')
+    smembers = command(cmd='SMEMBERS')
+    spop = command(cmd='SPOP')
+    srem = command(cmd='SREM')
+    sunion = command(cmd='SUNION')
+    sunionstore = command(cmd='SUNIONSTORE')
 
-    add = command('ADD')
-    read = command('READ')
-    flush_schedule = command('FLUSH_SCHEDULE')
-    length_schedule = command('LENGTH_SCHEDULE')
+    add = command(cmd='ADD')
+    read = command(cmd='READ')
+    flush_schedule = command(cmd='FLUSH_SCHEDULE')
+    length_schedule = command(cmd='LENGTH_SCHEDULE')
 
-    expire = command('EXPIRE')
-    info = command('INFO')
-    flushall = command('FLUSHALL')
-    save = command('SAVE')
-    restore = command('RESTORE')
-    merge = command('MERGE')
-    quit = command('QUIT')
-    shutdown = command('SHUTDOWN')
+    expire = command(cmd='EXPIRE')
+    info = command(cmd='INFO')
+    flushall = command(cmd='FLUSHALL')
+    save = command(cmd='SAVE')
+    restore = command(cmd='RESTORE')
+    merge = command(cmd='MERGE')
+    quit = command(cmd='QUIT')
+    shutdown = command(cmd='SHUTDOWN')
 
     def __getitem__(self, key):
         if isinstance(key, (list, tuple)):

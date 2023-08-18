@@ -17,28 +17,28 @@ def timed(s):
 
 
 def run_benchmark(client):
-    n = 10000
+    number = 10000
     with timed('get/set'):
-        for i in range(n):
+        for i in range(number):
             client.set('k%d' % i, 'v%d' % i)
 
-        for i in range(n + int(n * 0.1)):
+        for i in range(number + int(number * 0.1)):
             client.get('k%d' % i)
 
     with timed('serializing arrays'):
         arr = [1, 2, 3, 4, 5, 6, [7, 8, 9, [10, 11, 12], 13], 14, 15]
-        for i in range(n):
+        for i in range(number):
             client.set('k%d' % i, arr)
 
-        for i in range(n):
+        for i in range(number):
             client.get('k%d' % i)
 
     with timed('serializing dicts'):
-        d = {'k1': 'v1', 'k2': 'v2', 'k3': {'v3': {'v4': 'v5'}}}
-        for i in range(n):
-            client.set('k%d' % i, d)
+        key_value_pairs = {'k1': 'v1', 'k2': 'v2', 'k3': {'v3': {'v4': 'v5'}}}
+        for i in range(number):
+            client.set('k%d' % i, key_value_pairs)
 
-        for i in range(n):
+        for i in range(number):
             client.get('k%d' % i)
 
 

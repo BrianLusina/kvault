@@ -18,7 +18,7 @@ def run_queue_server():
     return greenlet, queue_server
 
 
-class KeyPartial(object):
+class KeyPartial:
     def __init__(self, client, key):
         self.client = client
         self.key = key
@@ -44,31 +44,31 @@ class KvaultMiniDatabaseTestCases(unittest.TestCase):
         self.c.flush()
 
     def test_list(self):
-        lq = KeyPartial(self.c, 'queue')
+        key_partial = KeyPartial(self.c, 'queue')
 
-        lq.lpush('i1')
-        lq.lpush('i2')
-        lq.rpush('i3')
-        lq.rpush('i4')
-        result = lq.lrange(0)
+        key_partial.lpush('i1')
+        key_partial.lpush('i2')
+        key_partial.rpush('i3')
+        key_partial.rpush('i4')
+        result = key_partial.lrange(0)
         self.assertEqual(result, ['i2', 'i1', 'i3', 'i4'])
 
-        self.assertEqual(lq.lpop(), 'i2')
-        self.assertEqual(lq.rpop(), 'i4')
-        self.assertEqual(lq.llen(), 2)
+        self.assertEqual(key_partial.lpop(), 'i2')
+        self.assertEqual(key_partial.rpop(), 'i4')
+        self.assertEqual(key_partial.llen(), 2)
 
-        self.assertEqual(lq.lrem('i3'), 1)
-        self.assertEqual(lq.lrem('i3'), 0)
+        self.assertEqual(key_partial.lrem('i3'), 1)
+        self.assertEqual(key_partial.lrem('i3'), 0)
 
-        lq.lpush('a1', 'a2', 'a3', 'a4')
-        self.assertEqual(lq.lindex(2), 'a2')
+        key_partial.lpush('a1', 'a2', 'a3', 'a4')
+        self.assertEqual(key_partial.lindex(2), 'a2')
 
-        lq.lset(2, 'x')
-        self.assertEqual(lq.lrange(1, 3), ['a3', 'x'])
+        key_partial.lset(2, 'x')
+        self.assertEqual(key_partial.lrange(1, 3), ['a3', 'x'])
 
-        lq.ltrim(1, 4)
-        self.assertEqual(lq.lrange(0), ['a3', 'x', 'a1'])
-        self.assertEqual(lq.lflush(), 3)
+        key_partial.ltrim(1, 4)
+        self.assertEqual(key_partial.lrange(0), ['a3', 'x', 'a1'])
+        self.assertEqual(key_partial.lflush(), 3)
 
     def test_kv(self):
         kp = KeyPartial(self.c, 'k1')

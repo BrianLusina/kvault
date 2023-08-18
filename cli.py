@@ -8,6 +8,9 @@ from kvault.infra.logger import logger
 
 
 def get_option_parser():
+    """
+    Provides a parser with options
+    """
     parser = optparse.OptionParser()
     parser.add_option('-d', '--debug', action='store_true', dest='debug',
                       help='Log debug messages.')
@@ -26,21 +29,24 @@ def get_option_parser():
 
 
 def load_extensions(server, extensions):
+    """
+    Load provided extensions and include them as modules for the server to use
+    :param server: Instance of server
+    :param extensions: list of extensions to use
+    """
     for extension in extensions:
         try:
             module = importlib.import_module(extension)
         except ImportError:
-            logger.exception('Could not import extension %s' % extension)
+            logger.exception(f'Could not import extension {extension}')
         else:
             try:
                 initialize = getattr(module, 'initialize')
             except AttributeError:
-                logger.exception('Could not find "initialize" function in '
-                                 'extension %s' % extension)
+                logger.exception(f'Could not find "initialize" function in extension {extension}')
                 raise
-            else:
-                initialize(server)
-                logger.info('Loaded %s extension.' % extension)
+            initialize(server)
+            logger.info('Loaded %s extension.' % extension)
 
 
 if __name__ == '__main__':
