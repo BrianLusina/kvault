@@ -1,0 +1,87 @@
+# You can override the included template(s) by including variable overrides
+# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+# Secret Detection customization: https://docs.gitlab.com/ee/user/application_security/secret_detection/#customizing-settings
+# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
+# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
+# Note that environment variables can be set in several places
+# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
+
+image: python:3.10.4
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+
+stages:
+  - lint
+  - test
+  - build
+  - publish
+  - release
+  - docker
+
+before_script:
+  - export POETRY_HOME=/opt/poetry
+  - python3 -m venv $POETRY_HOME
+  - pip install --upgrade pip
+  - pip install poetry
+  - poetry install
+
+lint:
+  stage: lint
+  script:
+    - make lint
+
+sast:
+  stage: test
+
+test:
+  stage: test
+  needs:
+    - lint
+  script:
+    - make test
+
+build:
+  stage: build
+  needs:
+    - test
+  script: make build
+  artifacts:
+    name: kvault-build
+    untracked: false
+    when: on_success
+    expire_in: "1 week"
+    paths:
+      - "dist/"
+
+release_job:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - echo "running release_job"
+  release:
+    tag_name: '$CI_COMMIT_TAG'
+    description: '$CI_COMMIT_TAG'
+
+publish-pypi:
+  stage: publish
+  script:
+    - make build
+    - TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi --verbose -u '__token__' ./dist/*
+  only:
+    - tags
+
+build_docker:
+  image: docker:latest
+  services:
+    - docker:dind
+  stage: docker
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  script:
+    - docker build -t $CI_REGISTRY/$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG .
+    - docker push $CI_REGISTRY/$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
+  only:
+    - tags
