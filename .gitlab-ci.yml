@@ -10,9 +10,14 @@ image: python:3.10.4
 
 include:
   - template: Security/SAST.gitlab-ci.yml
+  - project: sanctumlabs/tools/ci-workflows
+    file: .gitlab/templates/slack-notification.yml
+  - project: sanctumlabs/tools/ci-workflows
+    file: .gitlab/templates/sonarcloud.yml
 
 stages:
   - lint
+  - analysis
   - test
   - build
   - publish
@@ -30,6 +35,12 @@ lint:
   stage: lint
   script:
     - make lint
+
+sonarcloud-analysis:
+  stage: analysis
+  extends: .sonarcloud
+  variables:
+    DEFAULT_BRANCH: main
 
 sast:
   stage: test
